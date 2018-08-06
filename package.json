@@ -1,0 +1,7 @@
+{
+  "dependencies": {
+    "elm-format": "^0.7.0-exp",
+    "elm-test": "^0.18.12",
+    "elm-verify-examples": "^2.3.1"
+  }
+}
