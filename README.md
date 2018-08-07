@@ -13,8 +13,8 @@
 - [x] comments
 - [x] integers
 - [x] fractional floats
-- [ ] exp floats
-- [ ] exp fractional floats
+- [x] exp floats
+- [x] exp fractional floats
 - [x] infinity, nan
 - [x] booleans
 - [ ] arrays

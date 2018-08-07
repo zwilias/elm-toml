@@ -287,8 +287,8 @@ literalIntValue =
         |> describe "literal integer values"
 
 
-fractionalFloat : Test
-fractionalFloat =
+floatVal : Test
+floatVal =
     [ ( "0.0"
       , "0.0"
       , Just (Toml.Float 0)
@@ -313,9 +313,21 @@ fractionalFloat =
       , "9_224_617.445_991_228_313"
       , Just (Toml.Float 9224617.445991227)
       )
+    , ( "exponentiated"
+      , "10e2"
+      , Just (Toml.Float 1000)
+      )
+    , ( "negative exponent"
+      , "10e-2"
+      , Just (Toml.Float 0.1)
+      )
+    , ( "negative fractional with exponent"
+      , "-1.4e-4"
+      , Just (Toml.Float -0.00014)
+      )
     ]
         |> List.map makeValueTest
-        |> describe "fractional float values"
+        |> describe "float values"
 
 
 weirdFloats : Test

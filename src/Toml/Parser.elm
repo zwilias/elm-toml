@@ -435,7 +435,7 @@ float =
     inContext "float" <|
         oneOf
             [ fractional
-            , exponent
+            , exponential
             , infinity
             , nan
             ]
@@ -444,10 +444,40 @@ float =
 
 fractional : Parser Float
 fractional =
-    delayedCommitMap makeFloat integerPart <|
-        succeed identity
-            |. symbol "."
-            |= fractionalPart
+    succeed identity
+        |. symbol "."
+        |= fractionalPart
+        |> delayedCommitMap makeFloat integerPart
+        |> andThen maybeExponentiate
+
+
+exponential : Parser Float
+exponential =
+    delayedCommitMap applyExponent
+        signedFloatPart
+        (succeed identity
+            |. oneOf [ symbol "e", symbol "E" ]
+            |= signedFloatPart
+        )
+
+
+signedFloatPart : Parser Float
+signedFloatPart =
+    map (\( s, v ) -> toFloat (applySign s v))
+        integerPart
+
+
+maybeExponentiate : Float -> Parser Float
+maybeExponentiate n =
+    oneOf
+        [ exponent |> map (applyExponent n)
+        , succeed n
+        ]
+
+
+applyExponent : Float -> Float -> Float
+applyExponent coeff exp =
+    coeff * (10 ^ exp)
 
 
 makeFloat : ( Sign, Int ) -> String -> Float
@@ -461,6 +491,13 @@ toFractional floatString =
         |> String.toInt
         |> Result.withDefault 0
         |> dividedBy (10 ^ String.length floatString)
+
+
+exponent : Parser Float
+exponent =
+    succeed identity
+        |. oneOf [ symbol "e", symbol "E" ]
+        |= signedFloatPart
 
 
 dividedBy : Int -> Int -> Float
@@ -493,11 +530,6 @@ fractionalPart =
     in
     keep oneOrMore Char.isDigit
         |> andThen rest
-
-
-exponent : Parser Float
-exponent =
-    fail "TODO"
 
 
 infinity : Parser Float
