@@ -283,8 +283,8 @@ value =
     oneOf
         [ map Toml.String string
         , map Toml.Bool bool
-        , map Toml.Int int
         , map Toml.Float float
+        , map Toml.Int int
         , map Toml.Array array
         , map Toml.Table table
         ]
@@ -309,7 +309,141 @@ bool =
 
 int : Parser Int
 int =
-    Parser.fail "TODO: Support ints"
+    oneOf
+        [ hexInt
+        , octalInt
+        , binaryInt
+        , literalInt
+        ]
+        |. ws
+
+
+literalInt : Parser Int
+literalInt =
+    succeed applySign
+        |= sign
+        |= oneOf
+            [ symbol "0" |> map (always 0)
+            , strictlyPositiveInt
+            ]
+
+
+type Sign
+    = Pos
+    | Neg
+
+
+sign : Parser Sign
+sign =
+    oneOf
+        [ symbol "+" |> map (always Pos)
+        , symbol "-" |> map (always Neg)
+        , succeed Pos
+        ]
+
+
+applySign : Sign -> Int -> Int
+applySign sign val =
+    case sign of
+        Pos ->
+            val
+
+        Neg ->
+            negate val
+
+
+strictlyPositiveInt : Parser Int
+strictlyPositiveInt =
+    let
+        rest : String -> Parser Int
+        rest acc =
+            oneOf
+                [ succeed identity
+                    |. optional (symbol "_")
+                    |= keep oneOrMore Char.isDigit
+                    |> andThen (\c -> rest (acc ++ c))
+                , String.toInt acc
+                    |> result fail succeed
+                ]
+    in
+    keep (Exactly 1) (\x -> Char.isDigit x && x /= '0')
+        |> andThen rest
+
+
+hexInt : Parser Int
+hexInt =
+    nBaseInt "0x" hexDigit 16
+
+
+octalInt : Parser Int
+octalInt =
+    nBaseInt "0o" octalDigit 8
+
+
+binaryInt : Parser Int
+binaryInt =
+    nBaseInt "0b" bit 2
+
+
+nBaseInt : String -> Parser Int -> Int -> Parser Int
+nBaseInt prefix digit multiplier =
+    let
+        rest : Int -> Parser Int
+        rest acc =
+            oneOf
+                [ succeed identity
+                    |. optional (symbol "_")
+                    |= digit
+                    |> andThen (\b -> acc * multiplier + b |> rest)
+                , succeed acc
+                ]
+    in
+    succeed identity
+        |. symbol prefix
+        |= digit
+        |> andThen rest
+
+
+bit : Parser Int
+bit =
+    oneOf
+        [ symbol "1" |> map (always 1)
+        , symbol "0" |> map (always 0)
+        ]
+
+
+octalDigit : Parser Int
+octalDigit =
+    oneOf
+        [ bit
+        , symbol "2" |> map (always 2)
+        , symbol "3" |> map (always 3)
+        , symbol "4" |> map (always 4)
+        , symbol "5" |> map (always 5)
+        , symbol "6" |> map (always 6)
+        , symbol "7" |> map (always 7)
+        ]
+
+
+hexDigit : Parser Int
+hexDigit =
+    oneOf
+        [ octalDigit
+        , symbol "8" |> map (always 8)
+        , symbol "9" |> map (always 9)
+        , symbol "a" |> map (always 10)
+        , symbol "A" |> map (always 10)
+        , symbol "b" |> map (always 11)
+        , symbol "B" |> map (always 11)
+        , symbol "c" |> map (always 12)
+        , symbol "C" |> map (always 12)
+        , symbol "d" |> map (always 13)
+        , symbol "D" |> map (always 13)
+        , symbol "e" |> map (always 14)
+        , symbol "E" |> map (always 14)
+        , symbol "f" |> map (always 15)
+        , symbol "F" |> map (always 15)
+        ]
 
 
 
@@ -466,6 +600,14 @@ isControlChar keyCode =
 ws : Parser ()
 ws =
     ignore zeroOrMore (chars [ ' ', '\t' ])
+
+
+optional : Parser a -> Parser ()
+optional parser =
+    oneOf
+        [ map (always ()) parser
+        , succeed ()
+        ]
 
 
 result : (e -> v) -> (a -> v) -> Result e a -> v

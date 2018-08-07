@@ -87,20 +87,204 @@ keyFormats =
 boolValue : Test
 boolValue =
     [ ( "parse true"
-      , "key = true"
-      , Just [ ( "key", Toml.Bool True ) ]
+      , "true"
+      , Just (Toml.Bool True)
       )
     , ( "parse false"
-      , "key = false"
-      , Just [ ( "key", Toml.Bool False ) ]
+      , "false"
+      , Just (Toml.Bool False)
       )
     , ( "case sensitive"
-      , "key = True"
+      , "True"
       , Nothing
       )
     ]
-        |> List.map makeTest
+        |> List.map makeValueTest
         |> describe "boolean values"
+
+
+binaryIntValue : Test
+binaryIntValue =
+    [ ( "0"
+      , "0b0"
+      , Just (Toml.Int 0)
+      )
+    , ( "1"
+      , "0b1"
+      , Just (Toml.Int 1)
+      )
+    , ( "longer"
+      , "0b00101"
+      , Just (Toml.Int 5)
+      )
+    , ( "longer with underscores"
+      , "0b00_1_1"
+      , Just (Toml.Int 3)
+      )
+    , ( "empty"
+      , "0b"
+      , Nothing
+      )
+    , ( "non-binary"
+      , "0b2"
+      , Nothing
+      )
+    , ( "start with underscore"
+      , "0b_1"
+      , Nothing
+      )
+    , ( "trailing underscore"
+      , "0b1_"
+      , Nothing
+      )
+    ]
+        |> List.map makeValueTest
+        |> describe "binary integer values"
+
+
+octalIntValue : Test
+octalIntValue =
+    [ ( "0"
+      , "0o0"
+      , Just (Toml.Int 0)
+      )
+    , ( "1"
+      , "0o1"
+      , Just (Toml.Int 1)
+      )
+    , ( "7"
+      , "0o7"
+      , Just (Toml.Int 7)
+      )
+    , ( "longer"
+      , "0o01234567"
+      , Just (Toml.Int 342391)
+      )
+    , ( "longer with underscores"
+      , "0o10_4_7"
+      , Just (Toml.Int 551)
+      )
+    , ( "empty"
+      , "0o"
+      , Nothing
+      )
+    , ( "non-octal"
+      , "0o8"
+      , Nothing
+      )
+    , ( "start with underscore"
+      , "0o_1"
+      , Nothing
+      )
+    , ( "trailing underscore"
+      , "0o1_"
+      , Nothing
+      )
+    ]
+        |> List.map makeValueTest
+        |> describe "octal integer values"
+
+
+hexIntValue : Test
+hexIntValue =
+    [ ( "0"
+      , "0x0"
+      , Just (Toml.Int 0)
+      )
+    , ( "1"
+      , "0x1"
+      , Just (Toml.Int 1)
+      )
+    , ( "7"
+      , "0x7"
+      , Just (Toml.Int 7)
+      )
+    , ( "longer"
+      , "0x01234567"
+      , Just (Toml.Int 19088743)
+      )
+    , ( "longer with underscores"
+      , "0x10_4_7"
+      , Just (Toml.Int 4167)
+      )
+    , ( "deadbeef"
+      , "0xdeadbeef"
+      , Just (Toml.Int 3735928559)
+      )
+    , ( "dead_BEEF"
+      , "0xdead_BEEF"
+      , Just (Toml.Int 3735928559)
+      )
+    , ( "DEADBEEF"
+      , "0xDEADBEEF"
+      , Just (Toml.Int 3735928559)
+      )
+    , ( "empty"
+      , "0x"
+      , Nothing
+      )
+    , ( "non-hex"
+      , "0xg"
+      , Nothing
+      )
+    , ( "start with underscore"
+      , "0x_1"
+      , Nothing
+      )
+    , ( "trailing underscore"
+      , "0x1_"
+      , Nothing
+      )
+    ]
+        |> List.map makeValueTest
+        |> describe "hexadecimal integer values"
+
+
+literalIntValue : Test
+literalIntValue =
+    [ ( "0"
+      , "0"
+      , Just (Toml.Int 0)
+      )
+    , ( "+0"
+      , "+0"
+      , Just (Toml.Int 0)
+      )
+    , ( "-0"
+      , "-0"
+      , Just (Toml.Int 0)
+      )
+    , ( "123"
+      , "123"
+      , Just (Toml.Int 123)
+      )
+    , ( "-9999909"
+      , "-9999909"
+      , Just (Toml.Int -9999909)
+      )
+    , ( "underscores allowed"
+      , "123_456"
+      , Just (Toml.Int 123456)
+      )
+    , ( "no leading 0"
+      , "012"
+      , Nothing
+      )
+    , ( "no double sign"
+      , "--12"
+      , Nothing
+      )
+    , ( "no leading underscore"
+      , "_12"
+      , Nothing
+      )
+    , ( "no trailing underscore"
+      , "12_"
+      , Nothing
+      )
+    ]
+        |> List.map makeValueTest
+        |> describe "literal integer values"
 
 
 suite : Test
@@ -160,6 +344,15 @@ key.child2 = 'child 2'
 
 
 -- helpers
+
+
+makeValueTest : ( String, String, Maybe Toml.Value ) -> Test
+makeValueTest ( name, input, result ) =
+    makeTest
+        ( name
+        , "key = " ++ input
+        , Maybe.map (\x -> [ ( "key", x ) ]) result
+        )
 
 
 makeTest : ( String, String, Maybe (List ( String, Toml.Value )) ) -> Test
