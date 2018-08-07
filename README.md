@@ -17,7 +17,8 @@
 - [x] exp fractional floats
 - [x] infinity, nan
 - [x] booleans
-- [ ] arrays
+- [x] arrays
+- [ ] trailing commas
 - [ ] inline tables
 - [ ] tables
 - [ ] array of tables

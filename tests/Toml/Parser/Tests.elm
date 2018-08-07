@@ -1,5 +1,6 @@
 module Toml.Parser.Tests exposing (..)
 
+import Array.Hamt as Array exposing (Array)
 import Dict exposing (Dict)
 import Expect exposing (Expectation)
 import Test exposing (..)
@@ -386,6 +387,56 @@ weirdFloats =
                     |> Result.map isNaN
                     |> Expect.equal (Ok True)
         ]
+
+
+arrayValues : Test
+arrayValues =
+    [ ( "empty array"
+      , "[]"
+      , Just (Toml.Array Toml.AEmpty)
+      )
+    , ( "array of bools"
+      , "[true, false, false]"
+      , Just (Toml.Array (Toml.ABool (Array.fromList [ True, False, False ])))
+      )
+    , ( "array of ints"
+      , "[1, 2, 3]"
+      , Just (Toml.Array (Toml.AInt (Array.fromList [ 1, 2, 3 ])))
+      )
+    , ( "no mixed arrays"
+      , "[true, 1]"
+      , Nothing
+      )
+    , ( "whitespace between elements"
+      , """[
+   "foo",
+   "bar" ,
+   "baz"
+]
+      """
+      , Just (Toml.Array (Toml.AString (Array.fromList [ "foo", "bar", "baz" ])))
+      )
+    , ( "array of arrays"
+      , "[[], []]"
+      , Just (Toml.Array (Toml.AArray (Array.fromList [ Toml.AEmpty, Toml.AEmpty ])))
+      )
+    , ( "mixed array of arrays"
+      , "[[], [true], [1, 2, 3]]"
+      , Just
+            (Toml.Array
+                (Toml.AArray
+                    (Array.fromList
+                        [ Toml.AEmpty
+                        , Toml.ABool (Array.fromList [ True ])
+                        , Toml.AInt (Array.fromList [ 1, 2, 3 ])
+                        ]
+                    )
+                )
+            )
+      )
+    ]
+        |> List.map makeValueTest
+        |> describe "array values"
 
 
 suite : Test

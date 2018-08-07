@@ -1,5 +1,6 @@
 module Toml.Parser exposing (parse)
 
+import Array.Hamt as Array exposing (Array)
 import Char
 import Dict exposing (Dict)
 import Parser
@@ -21,6 +22,7 @@ import Parser
         , map
         , oneOf
         , oneOrMore
+        , repeat
         , succeed
         , symbol
         , zeroOrMore
@@ -595,8 +597,58 @@ applySign sign val =
 
 array : Parser Toml.ArrayValue
 array =
+    let
+        self : Parser Toml.ArrayValue
+        self =
+            lazy (\_ -> array)
+    in
     inContext "array" <|
-        fail "TODO"
+        succeed identity
+            |. symbol "["
+            |. arrWs
+            |= oneOf
+                [ andThen (start Toml.AString string) string
+                , andThen (start Toml.ABool bool) bool
+                , andThen (start Toml.AFloat float) float
+                , andThen (start Toml.AInt int) int
+                , andThen (start Toml.AArray self) self
+                , succeed Toml.AEmpty
+                ]
+            |. arrWs
+            |. symbol "]"
+
+
+start :
+    (Array a -> Toml.ArrayValue)
+    -> Parser a
+    -> a
+    -> Parser Toml.ArrayValue
+start toArrVal elem first =
+    rest toArrVal elem (Array.push first Array.empty)
+
+
+rest :
+    (Array a -> Toml.ArrayValue)
+    -> Parser a
+    -> Array a
+    -> Parser Toml.ArrayValue
+rest toArrVal elem acc =
+    oneOf
+        [ (delayedCommit arrWs <|
+            succeed identity
+                |. symbol ","
+                |. arrWs
+                |= elem
+          )
+            |> andThen (\x -> rest toArrVal elem (Array.push x acc))
+        , succeed (toArrVal acc)
+        ]
+
+
+arrWs : Parser ()
+arrWs =
+    repeat oneOrMore (oneOf [ eolOrComment, reqWs ])
+        |> optional
 
 
 
@@ -737,6 +789,11 @@ isControlChar keyCode =
 ws : Parser ()
 ws =
     ignore zeroOrMore (chars [ ' ', '\t' ])
+
+
+reqWs : Parser ()
+reqWs =
+    ignore oneOrMore (chars [ ' ', '\t' ])
 
 
 optional : Parser a -> Parser ()
