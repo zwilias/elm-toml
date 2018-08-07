@@ -27,11 +27,17 @@ import Parser
 import Toml
 
 
+{-| Run the parser and extract the final result
+-}
 parse : String -> Result Parser.Error Toml.Document
 parse input =
     input
         |> Parser.run (document emptyAcc)
         |> Result.map .final
+
+
+
+-- Auxilliary types
 
 
 type alias Key =
@@ -46,6 +52,12 @@ type alias Acc =
     }
 
 
+type Entry
+    = Empty
+    | KVPair ( Key, Toml.Value )
+    | Header Bool Key
+
+
 emptyAcc : Acc
 emptyAcc =
     { final = Dict.empty
@@ -55,10 +67,8 @@ emptyAcc =
     }
 
 
-type Entry
-    = Empty
-    | KVPair ( Key, Toml.Value )
-    | Header Bool Key
+
+-- Parsing the document
 
 
 document : Acc -> Parser Acc
@@ -74,15 +84,6 @@ document acc =
                     , lazy (\_ -> document newAcc)
                     ]
             )
-
-
-parseEntry : Parser Entry
-parseEntry =
-    oneOf
-        [ map (\_ -> Empty) comment
-        , map (\_ -> Empty) eol
-        , map KVPair kvPair
-        ]
 
 
 commit : Acc -> Entry -> Parser Acc
@@ -172,19 +173,17 @@ finalize acc =
                         fail e
 
 
-ws : Parser ()
-ws =
-    ignore zeroOrMore (chars [ ' ', '\t' ])
+
+-- Parsing entries
 
 
-chars : List Char -> Char -> Bool
-chars xs x =
-    List.member x xs
-
-
-noneMatch : List (Char -> Bool) -> Char -> Bool
-noneMatch matchers c =
-    not <| List.any (\m -> m c) matchers
+parseEntry : Parser Entry
+parseEntry =
+    oneOf
+        [ map (\_ -> Empty) comment
+        , map (\_ -> Empty) eol
+        , map KVPair kvPair
+        ]
 
 
 comment : Parser String
@@ -201,14 +200,6 @@ eol =
     oneOf [ ignore oneOrMore ((==) '\n'), end ]
 
 
-eolOrComment : Parser ()
-eolOrComment =
-    oneOf
-        [ eol
-        , map (\_ -> ()) comment
-        ]
-
-
 kvPair : Parser ( Key, Toml.Value )
 kvPair =
     inContext "key value pair" <|
@@ -218,6 +209,18 @@ kvPair =
             |. ws
             |= value
             |. eolOrComment
+
+
+eolOrComment : Parser ()
+eolOrComment =
+    oneOf
+        [ eol
+        , map (\_ -> ()) comment
+        ]
+
+
+
+-- Parsing keys
 
 
 key : Parser Key
@@ -241,8 +244,8 @@ keyPart : Parser String
 keyPart =
     oneOf
         [ bareKey
-        , literalString
-        , regularString
+        , singleQuotedKey
+        , doublyQuotedKey
         ]
         |. ws
 
@@ -255,7 +258,24 @@ bareKey =
 
 isKeyChar : Char -> Bool
 isKeyChar c =
-    Char.isUpper c || Char.isLower c || Char.isDigit c || List.member c [ '_', '-' ]
+    Char.isUpper c
+        || Char.isLower c
+        || Char.isDigit c
+        || List.member c [ '_', '-' ]
+
+
+singleQuotedKey : Parser String
+singleQuotedKey =
+    literalString
+
+
+doublyQuotedKey : Parser String
+doublyQuotedKey =
+    regularString
+
+
+
+-- Parsing values
 
 
 value : Parser Toml.Value
@@ -271,9 +291,29 @@ value =
         |. ws
 
 
+
+-- parsing bools
+
+
+bool : Parser Bool
+bool =
+    oneOf
+        [ map (always True) (keyword "true")
+        , map (always False) (keyword "false")
+        ]
+
+
+
+-- parsing integers
+
+
 int : Parser Int
 int =
     Parser.fail "TODO: Support ints"
+
+
+
+--parsing floats
 
 
 float : Parser Float
@@ -281,14 +321,26 @@ float =
     Parser.fail "TODO: Support floats"
 
 
+
+-- parsing array values
+
+
 array : Parser Toml.ArrayValue
 array =
     Parser.fail "TODO"
 
 
+
+--parsing inline tables
+
+
 table : Parser Toml.Document
 table =
     Parser.fail "TODO"
+
+
+
+--parsing strings
 
 
 string : Parser String
@@ -407,12 +459,13 @@ isControlChar keyCode =
     (keyCode < 0x20) || (keyCode == 0x7F)
 
 
-bool : Parser Bool
-bool =
-    oneOf
-        [ map (always True) (keyword "true")
-        , map (always False) (keyword "false")
-        ]
+
+-- generic helpers
+
+
+ws : Parser ()
+ws =
+    ignore zeroOrMore (chars [ ' ', '\t' ])
 
 
 result : (e -> v) -> (a -> v) -> Result e a -> v
@@ -423,3 +476,13 @@ result onErr onOk res =
 
         Err e ->
             onErr e
+
+
+chars : List Char -> Char -> Bool
+chars xs x =
+    List.member x xs
+
+
+noneMatch : List (Char -> Bool) -> Char -> Bool
+noneMatch matchers c =
+    not <| List.any (\m -> m c) matchers
