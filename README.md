@@ -18,10 +18,11 @@
 - [x] infinity, nan
 - [x] booleans
 - [x] arrays
-- [ ] trailing commas
+- [x] trailing commas
 - [ ] inline tables
 - [ ] tables
 - [ ] array of tables
+- [ ] dates, localdates, time, ...
 
 ## Decoder
 
