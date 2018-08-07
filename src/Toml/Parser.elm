@@ -616,6 +616,7 @@ array =
                 ]
             |. arrWs
             |. symbol "]"
+            |. ws
 
 
 start :
@@ -634,15 +635,20 @@ rest :
     -> Parser Toml.ArrayValue
 rest toArrVal elem acc =
     oneOf
-        [ (delayedCommit arrWs <|
-            succeed identity
-                |. symbol ","
-                |. arrWs
-                |= elem
-          )
+        [ delayedCommit arraySep elem
             |> andThen (\x -> rest toArrVal elem (Array.push x acc))
         , succeed (toArrVal acc)
+            |. arrWs
+            |. optional (symbol ",")
         ]
+
+
+arraySep : Parser ()
+arraySep =
+    succeed ()
+        |. arrWs
+        |. symbol ","
+        |. arrWs
 
 
 arrWs : Parser ()

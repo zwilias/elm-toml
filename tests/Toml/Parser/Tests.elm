@@ -434,6 +434,10 @@ arrayValues =
                 )
             )
       )
+    , ( "Trailing comma"
+      , "[1, 2, ]"
+      , Just (Toml.Array (Toml.AInt (Array.fromList [ 1, 2 ])))
+      )
     ]
         |> List.map makeValueTest
         |> describe "array values"
