@@ -10,6 +10,7 @@ import Parser
         , Parser
         , andThen
         , delayedCommit
+        , delayedCommitMap
         , end
         , fail
         , ignore
@@ -280,15 +281,16 @@ doublyQuotedKey =
 
 value : Parser Toml.Value
 value =
-    oneOf
-        [ map Toml.String string
-        , map Toml.Bool bool
-        , map Toml.Float float
-        , map Toml.Int int
-        , map Toml.Array array
-        , map Toml.Table table
-        ]
-        |. ws
+    inContext "value" <|
+        oneOf
+            [ map Toml.String string
+            , map Toml.Bool bool
+            , map Toml.Float float
+            , map Toml.Int int
+            , map Toml.Array array
+            , map Toml.Table table
+            ]
+            |. ws
 
 
 
@@ -297,10 +299,11 @@ value =
 
 bool : Parser Bool
 bool =
-    oneOf
-        [ map (always True) (keyword "true")
-        , map (always False) (keyword "false")
-        ]
+    inContext "bool" <|
+        oneOf
+            [ map (always True) (keyword "true")
+            , map (always False) (keyword "false")
+            ]
 
 
 
@@ -309,13 +312,14 @@ bool =
 
 int : Parser Int
 int =
-    oneOf
-        [ hexInt
-        , octalInt
-        , binaryInt
-        , literalInt
-        ]
-        |. ws
+    inContext "int" <|
+        oneOf
+            [ hexInt
+            , octalInt
+            , binaryInt
+            , literalInt
+            ]
+            |. ws
 
 
 literalInt : Parser Int
@@ -326,30 +330,6 @@ literalInt =
             [ symbol "0" |> map (always 0)
             , strictlyPositiveInt
             ]
-
-
-type Sign
-    = Pos
-    | Neg
-
-
-sign : Parser Sign
-sign =
-    oneOf
-        [ symbol "+" |> map (always Pos)
-        , symbol "-" |> map (always Neg)
-        , succeed Pos
-        ]
-
-
-applySign : Sign -> Int -> Int
-applySign sign val =
-    case sign of
-        Pos ->
-            val
-
-        Neg ->
-            negate val
 
 
 strictlyPositiveInt : Parser Int
@@ -366,7 +346,7 @@ strictlyPositiveInt =
                     |> result fail succeed
                 ]
     in
-    keep (Exactly 1) (\x -> Char.isDigit x && x /= '0')
+    keep oneOrMore (\x -> Char.isDigit x && x /= '0')
         |> andThen rest
 
 
@@ -452,7 +432,129 @@ hexDigit =
 
 float : Parser Float
 float =
-    Parser.fail "TODO: Support floats"
+    inContext "float" <|
+        oneOf
+            [ fractional
+            , exponent
+            , infinity
+            , nan
+            ]
+            |. ws
+
+
+fractional : Parser Float
+fractional =
+    delayedCommitMap makeFloat integerPart <|
+        succeed identity
+            |. symbol "."
+            |= fractionalPart
+
+
+makeFloat : ( Sign, Int ) -> String -> Float
+makeFloat ( sign, integerPart ) fractionalPart =
+    applySign sign (toFloat integerPart + toFractional fractionalPart)
+
+
+toFractional : String -> Float
+toFractional floatString =
+    floatString
+        |> String.toInt
+        |> Result.withDefault 0
+        |> dividedBy (10 ^ String.length floatString)
+
+
+dividedBy : Int -> Int -> Float
+dividedBy divisor dividend =
+    toFloat dividend / toFloat divisor
+
+
+integerPart : Parser ( Sign, Int )
+integerPart =
+    succeed (,)
+        |= sign
+        |= oneOf
+            [ symbol "0" |> map (always 0)
+            , strictlyPositiveInt
+            ]
+
+
+fractionalPart : Parser String
+fractionalPart =
+    let
+        rest : String -> Parser String
+        rest acc =
+            oneOf
+                [ succeed identity
+                    |. optional (symbol "_")
+                    |= keep oneOrMore Char.isDigit
+                    |> andThen (\s -> rest <| acc ++ s)
+                , succeed acc
+                ]
+    in
+    keep oneOrMore Char.isDigit
+        |> andThen rest
+
+
+exponent : Parser Float
+exponent =
+    fail "TODO"
+
+
+infinity : Parser Float
+infinity =
+    delayedCommitMap (\s _ -> infinityVal s)
+        sign
+        (symbol "inf")
+
+
+infinityVal : Sign -> Float
+infinityVal sign =
+    case sign of
+        Pos ->
+            1 / 0
+
+        Neg ->
+            -1 / 0
+
+
+nan : Parser Float
+nan =
+    delayedCommitMap (\_ _ -> nanVal)
+        sign
+        (symbol "nan")
+
+
+nanVal : Float
+nanVal =
+    0 / 0
+
+
+
+-- number helpers
+
+
+type Sign
+    = Pos
+    | Neg
+
+
+sign : Parser Sign
+sign =
+    oneOf
+        [ symbol "+" |> map (always Pos)
+        , symbol "-" |> map (always Neg)
+        , succeed Pos
+        ]
+
+
+applySign : Sign -> number -> number
+applySign sign val =
+    case sign of
+        Pos ->
+            val
+
+        Neg ->
+            negate val
 
 
 
@@ -461,7 +563,8 @@ float =
 
 array : Parser Toml.ArrayValue
 array =
-    Parser.fail "TODO"
+    inContext "array" <|
+        fail "TODO"
 
 
 
@@ -470,7 +573,8 @@ array =
 
 table : Parser Toml.Document
 table =
-    Parser.fail "TODO"
+    inContext "inline table" <|
+        fail "TODO"
 
 
 
@@ -479,7 +583,8 @@ table =
 
 string : Parser String
 string =
-    oneOf [ literalString, regularString ]
+    inContext "string" <|
+        oneOf [ literalString, regularString ]
 
 
 literalString : Parser String

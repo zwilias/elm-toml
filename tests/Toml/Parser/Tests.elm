@@ -287,6 +287,95 @@ literalIntValue =
         |> describe "literal integer values"
 
 
+fractionalFloat : Test
+fractionalFloat =
+    [ ( "0.0"
+      , "0.0"
+      , Just (Toml.Float 0)
+      )
+    , ( "-0.0"
+      , "-0.0"
+      , Just (Toml.Float 0)
+      )
+    , ( "+0.0"
+      , "+0.0"
+      , Just (Toml.Float 0)
+      )
+    , ( "-123.456"
+      , "-123.456"
+      , Just (Toml.Float -123.456)
+      )
+    , ( "0.001"
+      , "0.001"
+      , Just (Toml.Float 0.001)
+      )
+    , ( "underscores"
+      , "9_224_617.445_991_228_313"
+      , Just (Toml.Float 9224617.445991227)
+      )
+    ]
+        |> List.map makeValueTest
+        |> describe "fractional float values"
+
+
+weirdFloats : Test
+weirdFloats =
+    let
+        extractVal : Toml.Document -> Result String Float
+        extractVal doc =
+            case Dict.get "key" doc of
+                Just (Toml.Float v) ->
+                    Ok v
+
+                _ ->
+                    Err "key not found or not a Float"
+    in
+    describe "edge case float tests"
+        [ test "infinity" <|
+            \_ ->
+                Toml.Parser.parse "key = inf"
+                    |> Result.mapError toString
+                    |> Result.andThen extractVal
+                    |> Result.map (\x -> isInfinite x && x > 0)
+                    |> Expect.equal (Ok True)
+        , test "positive infinity" <|
+            \_ ->
+                Toml.Parser.parse "key = +inf"
+                    |> Result.mapError toString
+                    |> Result.andThen extractVal
+                    |> Result.map (\x -> isInfinite x && x > 0)
+                    |> Expect.equal (Ok True)
+        , test "negative infinity" <|
+            \_ ->
+                Toml.Parser.parse "key = -inf"
+                    |> Result.mapError toString
+                    |> Result.andThen extractVal
+                    |> Result.map (\x -> isInfinite x && x < 0)
+                    |> Expect.equal (Ok True)
+        , test "nan" <|
+            \_ ->
+                Toml.Parser.parse "key = nan"
+                    |> Result.mapError toString
+                    |> Result.andThen extractVal
+                    |> Result.map isNaN
+                    |> Expect.equal (Ok True)
+        , test "pos nan" <|
+            \_ ->
+                Toml.Parser.parse "key = +nan"
+                    |> Result.mapError toString
+                    |> Result.andThen extractVal
+                    |> Result.map isNaN
+                    |> Expect.equal (Ok True)
+        , test "neg nan" <|
+            \_ ->
+                Toml.Parser.parse "key = -nan"
+                    |> Result.mapError toString
+                    |> Result.andThen extractVal
+                    |> Result.map isNaN
+                    |> Expect.equal (Ok True)
+        ]
+
+
 suite : Test
 suite =
     describe "to be sorted"
