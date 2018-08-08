@@ -23,10 +23,12 @@ update tomlString model =
             , encode tomlDoc |> toJS
             )
 
-        Err _ ->
-            ( model
-            , toJS Encode.null
-            )
+        Err e ->
+            Debug.log "error" e
+                |> always
+                    ( model
+                    , toJS Encode.null
+                    )
 
 
 main : Program Never () String

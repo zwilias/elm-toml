@@ -501,6 +501,21 @@ b = true
         |> describe "array of tables tests"
 
 
+stringValues : Test
+stringValues =
+    makeValueTests "string value tests"
+        Toml.String
+        [ ( "unicode escape"
+          , "\"\\u03B4\""
+          , Just "δ"
+          )
+        , ( "long unicode escape"
+          , "\"\\U000003B4\""
+          , Just "δ"
+          )
+        ]
+
+
 
 -- helpers
 

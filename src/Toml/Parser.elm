@@ -27,6 +27,7 @@ import Parser
         , symbol
         , zeroOrMore
         )
+import String.UTF32
 import Toml
 import Toml.Calendar as Calendar
 
@@ -979,31 +980,20 @@ symbolicString ( expected, replacement ) =
 
 escapedUnicode : Parser String
 escapedUnicode =
-    {- TOML (and soon, Elm) allow arbitrary UTF-16 codepoints to be written
-       using `\uBEEF` syntax. These may also appear in escaped version in TOML,
-       so a literal `\u` followed by 4 hexadecimal characters.
-
-       This means something like a space may also be written as `\\u0020`
-
-       TODO: TOML doesn't actually allow UTF-16 codepoints, but rather unicode
-       scalar values
-    -}
-    succeed (Char.fromCode >> String.fromChar)
-        |. symbol "\\u"
+    succeed (\a b -> foldHex a 0 |> foldHex b |> String.UTF32.byteToString)
+        |. oneOf [ symbol "\\u", symbol "\\U" ]
         |= hexQuad
+        |= oneOf [ hexQuad, succeed [] ]
 
 
-hexQuad : Parser Int
+foldHex : List Int -> Int -> Int
+foldHex xs n =
+    List.foldl (\x acc -> acc * 16 + x) n xs
+
+
+hexQuad : Parser (List Int)
 hexQuad =
-    keep (Exactly 4) Char.isHexDigit |> andThen hexQuadToInt
-
-
-hexQuadToInt : String -> Parser Int
-hexQuadToInt quad =
-    ("0x" ++ quad)
-        -- Kind of cheating here.
-        |> String.toInt
-        |> result fail succeed
+    repeat (Exactly 4) hexDigit
 
 
 nonControlCharacters : Parser String
