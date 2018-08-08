@@ -87,248 +87,95 @@ keyFormats =
 
 boolValue : Test
 boolValue =
-    [ ( "parse true"
-      , "true"
-      , Just (Toml.Bool True)
-      )
-    , ( "parse false"
-      , "false"
-      , Just (Toml.Bool False)
-      )
-    , ( "case sensitive"
-      , "True"
-      , Nothing
-      )
-    ]
-        |> List.map makeValueTest
-        |> describe "boolean values"
+    makeValueTests "boolean values"
+        Toml.Bool
+        [ ( "parse true", "true", Just True )
+        , ( "parse false", "false", Just False )
+        , ( "case sensitive", "True", Nothing )
+        ]
 
 
 binaryIntValue : Test
 binaryIntValue =
-    [ ( "0"
-      , "0b0"
-      , Just (Toml.Int 0)
-      )
-    , ( "1"
-      , "0b1"
-      , Just (Toml.Int 1)
-      )
-    , ( "longer"
-      , "0b00101"
-      , Just (Toml.Int 5)
-      )
-    , ( "longer with underscores"
-      , "0b00_1_1"
-      , Just (Toml.Int 3)
-      )
-    , ( "empty"
-      , "0b"
-      , Nothing
-      )
-    , ( "non-binary"
-      , "0b2"
-      , Nothing
-      )
-    , ( "start with underscore"
-      , "0b_1"
-      , Nothing
-      )
-    , ( "trailing underscore"
-      , "0b1_"
-      , Nothing
-      )
-    ]
-        |> List.map makeValueTest
-        |> describe "binary integer values"
+    makeValueTests "binary integer values"
+        Toml.Int
+        [ ( "0", "0b0", Just 0 )
+        , ( "1", "0b1", Just 1 )
+        , ( "longer", "0b00101", Just 5 )
+        , ( "longer with underscores", "0b00_1_1", Just 3 )
+        , ( "empty", "0b", Nothing )
+        , ( "non-binary", "0b2", Nothing )
+        , ( "start with underscore", "0b_1", Nothing )
+        , ( "trailing underscore", "0b1_", Nothing )
+        ]
 
 
 octalIntValue : Test
 octalIntValue =
-    [ ( "0"
-      , "0o0"
-      , Just (Toml.Int 0)
-      )
-    , ( "1"
-      , "0o1"
-      , Just (Toml.Int 1)
-      )
-    , ( "7"
-      , "0o7"
-      , Just (Toml.Int 7)
-      )
-    , ( "longer"
-      , "0o01234567"
-      , Just (Toml.Int 342391)
-      )
-    , ( "longer with underscores"
-      , "0o10_4_7"
-      , Just (Toml.Int 551)
-      )
-    , ( "empty"
-      , "0o"
-      , Nothing
-      )
-    , ( "non-octal"
-      , "0o8"
-      , Nothing
-      )
-    , ( "start with underscore"
-      , "0o_1"
-      , Nothing
-      )
-    , ( "trailing underscore"
-      , "0o1_"
-      , Nothing
-      )
-    ]
-        |> List.map makeValueTest
-        |> describe "octal integer values"
+    makeValueTests "octal integer values"
+        Toml.Int
+        [ ( "0", "0o0", Just 0 )
+        , ( "1", "0o1", Just 1 )
+        , ( "7", "0o7", Just 7 )
+        , ( "longer", "0o01234567", Just 342391 )
+        , ( "longer with underscores", "0o10_4_7", Just 551 )
+        , ( "empty", "0o", Nothing )
+        , ( "non-octal", "0o8", Nothing )
+        , ( "start with underscore", "0o_1", Nothing )
+        , ( "trailing underscore", "0o1_", Nothing )
+        ]
 
 
 hexIntValue : Test
 hexIntValue =
-    [ ( "0"
-      , "0x0"
-      , Just (Toml.Int 0)
-      )
-    , ( "1"
-      , "0x1"
-      , Just (Toml.Int 1)
-      )
-    , ( "7"
-      , "0x7"
-      , Just (Toml.Int 7)
-      )
-    , ( "longer"
-      , "0x01234567"
-      , Just (Toml.Int 19088743)
-      )
-    , ( "longer with underscores"
-      , "0x10_4_7"
-      , Just (Toml.Int 4167)
-      )
-    , ( "deadbeef"
-      , "0xdeadbeef"
-      , Just (Toml.Int 3735928559)
-      )
-    , ( "dead_BEEF"
-      , "0xdead_BEEF"
-      , Just (Toml.Int 3735928559)
-      )
-    , ( "DEADBEEF"
-      , "0xDEADBEEF"
-      , Just (Toml.Int 3735928559)
-      )
-    , ( "empty"
-      , "0x"
-      , Nothing
-      )
-    , ( "non-hex"
-      , "0xg"
-      , Nothing
-      )
-    , ( "start with underscore"
-      , "0x_1"
-      , Nothing
-      )
-    , ( "trailing underscore"
-      , "0x1_"
-      , Nothing
-      )
-    ]
-        |> List.map makeValueTest
-        |> describe "hexadecimal integer values"
+    makeValueTests "hexadecimal integer values"
+        Toml.Int
+        [ ( "0", "0x0", Just 0 )
+        , ( "1", "0x1", Just 1 )
+        , ( "7", "0x7", Just 7 )
+        , ( "longer", "0x01234567", Just 19088743 )
+        , ( "longer with underscores", "0x10_4_7", Just 4167 )
+        , ( "deadbeef", "0xdeadbeef", Just 3735928559 )
+        , ( "dead_BEEF", "0xdead_BEEF", Just 3735928559 )
+        , ( "DEADBEEF", "0xDEADBEEF", Just 3735928559 )
+        , ( "empty", "0x", Nothing )
+        , ( "non-hex", "0xg", Nothing )
+        , ( "start with underscore", "0x_1", Nothing )
+        , ( "trailing underscore", "0x1_", Nothing )
+        ]
 
 
 literalIntValue : Test
 literalIntValue =
-    [ ( "0"
-      , "0"
-      , Just (Toml.Int 0)
-      )
-    , ( "+0"
-      , "+0"
-      , Just (Toml.Int 0)
-      )
-    , ( "-0"
-      , "-0"
-      , Just (Toml.Int 0)
-      )
-    , ( "123"
-      , "123"
-      , Just (Toml.Int 123)
-      )
-    , ( "-9999909"
-      , "-9999909"
-      , Just (Toml.Int -9999909)
-      )
-    , ( "underscores allowed"
-      , "123_456"
-      , Just (Toml.Int 123456)
-      )
-    , ( "no leading 0"
-      , "012"
-      , Nothing
-      )
-    , ( "no double sign"
-      , "--12"
-      , Nothing
-      )
-    , ( "no leading underscore"
-      , "_12"
-      , Nothing
-      )
-    , ( "no trailing underscore"
-      , "12_"
-      , Nothing
-      )
-    ]
-        |> List.map makeValueTest
-        |> describe "literal integer values"
+    makeValueTests "literal integer values"
+        Toml.Int
+        [ ( "0", "0", Just 0 )
+        , ( "+0", "+0", Just 0 )
+        , ( "-0", "-0", Just 0 )
+        , ( "123", "123", Just 123 )
+        , ( "-9999909", "-9999909", Just -9999909 )
+        , ( "underscores allowed", "123_456", Just 123456 )
+        , ( "no leading 0", "012", Nothing )
+        , ( "no double sign", "--12", Nothing )
+        , ( "no leading underscore", "_12", Nothing )
+        , ( "no trailing underscore", "12_", Nothing )
+        ]
 
 
 floatVal : Test
 floatVal =
-    [ ( "0.0"
-      , "0.0"
-      , Just (Toml.Float 0)
-      )
-    , ( "-0.0"
-      , "-0.0"
-      , Just (Toml.Float 0)
-      )
-    , ( "+0.0"
-      , "+0.0"
-      , Just (Toml.Float 0)
-      )
-    , ( "-123.456"
-      , "-123.456"
-      , Just (Toml.Float -123.456)
-      )
-    , ( "0.001"
-      , "0.001"
-      , Just (Toml.Float 0.001)
-      )
-    , ( "underscores"
-      , "9_224_617.445_991_228_313"
-      , Just (Toml.Float 9224617.445991227)
-      )
-    , ( "exponentiated"
-      , "10e2"
-      , Just (Toml.Float 1000)
-      )
-    , ( "negative exponent"
-      , "10e-2"
-      , Just (Toml.Float 0.1)
-      )
-    , ( "negative fractional with exponent"
-      , "-1.4e-4"
-      , Just (Toml.Float -0.00014)
-      )
-    ]
-        |> List.map makeValueTest
-        |> describe "float values"
+    makeValueTests "float values"
+        Toml.Float
+        [ ( "0.0", "0.0", Just 0 )
+        , ( "-0.0", "-0.0", Just 0 )
+        , ( "+0.0", "+0.0", Just 0 )
+        , ( "-123.456", "-123.456", Just -123.456 )
+        , ( "0.001", "0.001", Just 0.001 )
+        , ( "underscores", "9_224_617.445_991_228_313", Just 9224617.445991227 )
+        , ( "exponentiated", "10e2", Just 1000 )
+        , ( "negative exponent", "10e-2", Just 0.1 )
+        , ( "negative fractional with exponent", "-1.4e-4", Just -0.00014 )
+        ]
 
 
 weirdFloats : Test
@@ -449,6 +296,18 @@ localDateVal =
       , "2018-08-08"
       , Just (Toml.LocalDate { year = 2018, month = 8, day = 8 })
       )
+    , ( "3 digit year"
+      , "200-08-09"
+      , Nothing
+      )
+    , ( "single digit month"
+      , "2018-8-08"
+      , Nothing
+      )
+    , ( "single digit day"
+      , "2018-08-8"
+      , Nothing
+      )
     ]
         |> List.map makeValueTest
         |> describe "local date values"
@@ -463,6 +322,10 @@ localTimeVal =
     , ( "fractional seconds"
       , "23:59:59.999"
       , Just (Toml.LocalTime { hours = 23, minutes = 59, seconds = 59.999 })
+      )
+    , ( "single digits"
+      , "1:1:1"
+      , Nothing
       )
     ]
         |> List.map makeValueTest
@@ -485,9 +348,26 @@ localDateTime =
         |> describe "local datetime values"
 
 
-suite : Test
-suite =
-    describe "to be sorted"
+dateTimeVal : Test
+dateTimeVal =
+    [ ( "simple test"
+      , "2018-08-08T10:54:00+02:00"
+      , Just
+            (Toml.DateTime
+                { date = { year = 2018, month = 8, day = 8 }
+                , time = { hours = 10, minutes = 54, seconds = 0 }
+                , offset = { hours = 2, minutes = 0 }
+                }
+            )
+      )
+    ]
+        |> List.map makeValueTest
+        |> describe "datetime values"
+
+
+structural : Test
+structural =
+    describe "structural checks"
         [ test "skips empty lines" <|
             \_ ->
                 """
@@ -542,6 +422,12 @@ key.child2 = 'child 2'
 
 
 -- helpers
+
+
+makeValueTests : String -> (a -> Toml.Value) -> List ( String, String, Maybe a ) -> Test
+makeValueTests description tagger tests =
+    List.map (\( n, i, r ) -> makeValueTest ( n, i, Maybe.map tagger r )) tests
+        |> describe description
 
 
 makeValueTest : ( String, String, Maybe Toml.Value ) -> Test
