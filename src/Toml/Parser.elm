@@ -28,6 +28,7 @@ import Parser
         , zeroOrMore
         )
 import Toml
+import Toml.Calendar as Calendar
 
 
 {-| Run the parser and extract the final result
@@ -287,12 +288,120 @@ value =
         oneOf
             [ map Toml.String string
             , map Toml.Bool bool
+            , map Toml.DateTime dateTime
+            , map Toml.LocalDateTime localDateTime
+            , map Toml.LocalDate localDate
+            , map Toml.LocalTime localTime
             , map Toml.Float float
             , map Toml.Int int
             , map Toml.Array array
             , map Toml.Table table
             ]
             |. ws
+
+
+
+-- parsing a local date
+
+
+localDate : Parser Calendar.Date
+localDate =
+    succeed Calendar.Date
+        |= delayedCommitMap (\year _ -> year) (dtDigits (Exactly 4)) (symbol "-")
+        |= dtDigits (Exactly 2)
+        |. symbol "-"
+        |= dtDigits (Exactly 2)
+
+
+digits : Count -> Parser String
+digits count =
+    keep count Char.isDigit
+
+
+dtDigits : Count -> Parser Int
+dtDigits count =
+    digits count
+        |> andThen (String.toInt >> result fail succeed)
+
+
+
+-- parsing a local time
+
+
+localTime : Parser Calendar.Time
+localTime =
+    succeed Calendar.Time
+        |= delayedCommitMap (\hours _ -> hours) (dtDigits (Exactly 2)) (symbol ":")
+        |= dtDigits (Exactly 2)
+        |. symbol ":"
+        |= seconds
+
+
+seconds : Parser Float
+seconds =
+    dtDigits (Exactly 2)
+        |> andThen maybeFractionalSeconds
+
+
+maybeFractionalSeconds : Int -> Parser Float
+maybeFractionalSeconds integerPart =
+    oneOf
+        [ succeed makeFloat
+            |. symbol "."
+            |= succeed integerPart
+            |= digits oneOrMore
+        , succeed (toFloat integerPart)
+        ]
+
+
+
+-- parsing a local datetime
+
+
+localDateTime : Parser Calendar.LocalDateTime
+localDateTime =
+    succeed Calendar.LocalDateTime
+        |= delayedCommitMap (\date _ -> date)
+            localDate
+            (oneOf [ symbol "t", symbol "T", symbol " " ])
+        |= localTime
+
+
+
+-- parsing an instant / datetime with timezone
+
+
+dateTime : Parser Calendar.DateTime
+dateTime =
+    delayedCommitMap
+        (\{ date, time } offset ->
+            { date = date, time = time, offset = offset }
+        )
+        localDateTime
+        offset
+
+
+offset : Parser Calendar.Offset
+offset =
+    oneOf
+        [ symbol "Z" |> map (always emptyOffset)
+        , symbol "z" |> map (always emptyOffset)
+        , numOffset
+        ]
+
+
+emptyOffset : Calendar.Offset
+emptyOffset =
+    { hours = 0, minutes = 0 }
+
+
+numOffset : Parser Calendar.Offset
+numOffset =
+    succeed (\s h m -> { hours = applySign s h, minutes = m })
+        |= sign
+        |= dtDigits (Exactly 2)
+        |. symbol ":"
+        |= dtDigits (Exactly 2)
 
 
 
@@ -327,7 +436,7 @@ int =
 literalInt : Parser Int
 literalInt =
     succeed applySign
-        |= sign
+        |= optionalSign
         |= oneOf
             [ symbol "0" |> map (always 0)
             , strictlyPositiveInt
@@ -449,7 +558,7 @@ fractional =
     succeed identity
         |. symbol "."
         |= fractionalPart
-        |> delayedCommitMap makeFloat integerPart
+        |> delayedCommitMap finishFloat integerPart
         |> andThen maybeExponentiate
 
 
@@ -482,9 +591,14 @@ applyExponent coeff exp =
     coeff * (10 ^ exp)
 
 
-makeFloat : ( Sign, Int ) -> String -> Float
-makeFloat ( sign, integerPart ) fractionalPart =
-    applySign sign (toFloat integerPart + toFractional fractionalPart)
+makeFloat : Int -> String -> Float
+makeFloat integerPart fractionalPart =
+    toFloat integerPart + toFractional fractionalPart
+
+
+finishFloat : ( Sign, Int ) -> String -> Float
+finishFloat ( sign, integerPart ) fractionalPart =
+    applySign sign (makeFloat integerPart fractionalPart)
 
 
 toFractional : String -> Float
@@ -510,7 +624,7 @@ dividedBy divisor dividend =
 integerPart : Parser ( Sign, Int )
 integerPart =
     succeed (,)
-        |= sign
+        |= optionalSign
         |= oneOf
             [ symbol "0" |> map (always 0)
             , strictlyPositiveInt
@@ -537,7 +651,7 @@ fractionalPart =
 infinity : Parser Float
 infinity =
     delayedCommitMap (\s _ -> infinityVal s)
-        sign
+        optionalSign
         (symbol "inf")
 
 
@@ -554,7 +668,7 @@ infinityVal sign =
 nan : Parser Float
 nan =
     delayedCommitMap (\_ _ -> nanVal)
-        sign
+        optionalSign
         (symbol "nan")
 
 
@@ -577,6 +691,13 @@ sign =
     oneOf
         [ symbol "+" |> map (always Pos)
         , symbol "-" |> map (always Neg)
+        ]
+
+
+optionalSign : Parser Sign
+optionalSign =
+    oneOf
+        [ sign
         , succeed Pos
         ]
 

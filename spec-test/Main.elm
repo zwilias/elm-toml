@@ -5,6 +5,7 @@ import Dict
 import Json.Decode exposing (Value)
 import Json.Encode as Encode
 import Toml
+import Toml.Calendar as Calendar
 import Toml.Parser
 
 
@@ -60,11 +61,80 @@ encodeValue value =
         Toml.Bool b ->
             val "bool" (boolToString b)
 
+        Toml.LocalDate d ->
+            val "local-date" (dateToString d)
+
+        Toml.LocalTime t ->
+            val "local-time" (timeToString t)
+
+        Toml.LocalDateTime dt ->
+            val "local-datetime" (dateToString dt.date ++ "T" ++ timeToString dt.time)
+
+        Toml.DateTime dt ->
+            val "datetime" (dateTimeToString dt)
+
         Toml.Array arr ->
             encodeArr arr
 
         Toml.Table t ->
             encode t
+
+
+dateToString : Calendar.Date -> String
+dateToString { year, month, day } =
+    toPaddedString 4 year
+        ++ "-"
+        ++ toPaddedString 2 month
+        ++ "-"
+        ++ toPaddedString 2 day
+
+
+timeToString : Calendar.Time -> String
+timeToString { hours, minutes, seconds } =
+    toPaddedString 2 hours
+        ++ ":"
+        ++ toPaddedString 2 minutes
+        ++ ":"
+        ++ secondsToString seconds
+
+
+secondsToString : Float -> String
+secondsToString s =
+    if toFloat (round s) == s then
+        toPaddedString 2 (round s)
+    else
+        toPaddedString 2 (floor s)
+            ++ "."
+            ++ toString (s - toFloat (floor s))
+
+
+dateTimeToString : Calendar.DateTime -> String
+dateTimeToString { date, time, offset } =
+    dateToString date
+        ++ "T"
+        ++ timeToString time
+        ++ offsetToString offset
+
+
+offsetToString : Calendar.Offset -> String
+offsetToString { hours, minutes } =
+    if hours == 0 && minutes == 0 then
+        "Z"
+    else if hours > 0 then
+        toPaddedString 2 hours
+            ++ ":"
+            ++ toPaddedString 2 minutes
+    else
+        "-"
+            ++ toPaddedString 2 (abs hours)
+            ++ ":"
+            ++ toPaddedString 2 minutes
+
+
+toPaddedString : Int -> Int -> String
+toPaddedString l v =
+    toString v
+        |> String.padLeft l '0'
 
 
 encodeArr : Toml.ArrayValue -> Value

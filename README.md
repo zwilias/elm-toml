@@ -22,7 +22,7 @@
 - [ ] inline tables
 - [ ] tables
 - [ ] array of tables
-- [ ] dates, localdates, time, ...
+- [x] dates, localdates, time, ...
 
 ## Decoder
 

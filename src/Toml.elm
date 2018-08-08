@@ -2,6 +2,7 @@ module Toml exposing (ArrayValue(..), Document, Value(..))
 
 import Array.Hamt as Array exposing (Array)
 import Dict exposing (Dict)
+import Toml.Calendar as Calendar
 
 
 type alias Document =
@@ -13,6 +14,10 @@ type Value
     | Int Int
     | Float Float
     | Bool Bool
+    | LocalDate Calendar.Date
+    | LocalTime Calendar.Time
+    | LocalDateTime Calendar.LocalDateTime
+    | DateTime Calendar.DateTime
     | Array ArrayValue
     | Table Document
 

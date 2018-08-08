@@ -443,6 +443,48 @@ arrayValues =
         |> describe "array values"
 
 
+localDateVal : Test
+localDateVal =
+    [ ( "simple test"
+      , "2018-08-08"
+      , Just (Toml.LocalDate { year = 2018, month = 8, day = 8 })
+      )
+    ]
+        |> List.map makeValueTest
+        |> describe "local date values"
+
+
+localTimeVal : Test
+localTimeVal =
+    [ ( "no fractional part for seconds"
+      , "08:49:35"
+      , Just (Toml.LocalTime { hours = 8, minutes = 49, seconds = 35 })
+      )
+    , ( "fractional seconds"
+      , "23:59:59.999"
+      , Just (Toml.LocalTime { hours = 23, minutes = 59, seconds = 59.999 })
+      )
+    ]
+        |> List.map makeValueTest
+        |> describe "local time values"
+
+
+localDateTime : Test
+localDateTime =
+    [ ( "simple test"
+      , "2018-08-08T08:55:12.5"
+      , Just
+            (Toml.LocalDateTime
+                { date = { year = 2018, month = 8, day = 8 }
+                , time = { hours = 8, minutes = 55, seconds = 12.5 }
+                }
+            )
+      )
+    ]
+        |> List.map makeValueTest
+        |> describe "local datetime values"
+
+
 suite : Test
 suite =
     describe "to be sorted"
