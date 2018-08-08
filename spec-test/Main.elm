@@ -137,6 +137,11 @@ toPaddedString l v =
         |> String.padLeft l '0'
 
 
+localDateTimeToString : Calendar.LocalDateTime -> String
+localDateTimeToString dt =
+    dateToString dt.date ++ "T" ++ timeToString dt.time
+
+
 encodeArr : Toml.ArrayValue -> Value
 encodeArr arr =
     case arr of
@@ -160,10 +165,30 @@ encodeArr arr =
                 |> List.map (val "float" << toString)
                 |> asArray
 
+        Toml.ALocalDate ds ->
+            Array.toList ds
+                |> List.map (val "local-date" << dateToString)
+                |> asArray
+
+        Toml.ALocalTime ts ->
+            Array.toList ts
+                |> List.map (val "local-time" << timeToString)
+                |> asArray
+
+        Toml.ALocalDateTime dts ->
+            Array.toList dts
+                |> List.map (val "local-datetime" << localDateTimeToString)
+                |> asArray
+
+        Toml.ADateTime dts ->
+            Array.toList dts
+                |> List.map (val "datetime" << dateTimeToString)
+                |> asArray
+
         Toml.ATable ts ->
             Array.toList ts
                 |> List.map encode
-                |> asArray
+                |> Encode.list
 
         Toml.AArray ars ->
             Array.toList ars

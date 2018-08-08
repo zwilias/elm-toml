@@ -27,6 +27,10 @@ type ArrayValue
     | ABool (Array Bool)
     | AInt (Array Int)
     | AFloat (Array Float)
+    | ALocalDate (Array Calendar.Date)
+    | ALocalTime (Array Calendar.Time)
+    | ALocalDateTime (Array Calendar.LocalDateTime)
+    | ADateTime (Array Calendar.DateTime)
     | ATable (Array Document)
     | AArray (Array ArrayValue)
     | AEmpty

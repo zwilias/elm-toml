@@ -238,39 +238,39 @@ weirdFloats =
 
 arrayValues : Test
 arrayValues =
-    [ ( "empty array"
-      , "[]"
-      , Just (Toml.Array Toml.AEmpty)
-      )
-    , ( "array of bools"
-      , "[true, false, false]"
-      , Just (Toml.Array (Toml.ABool (Array.fromList [ True, False, False ])))
-      )
-    , ( "array of ints"
-      , "[1, 2, 3]"
-      , Just (Toml.Array (Toml.AInt (Array.fromList [ 1, 2, 3 ])))
-      )
-    , ( "no mixed arrays"
-      , "[true, 1]"
-      , Nothing
-      )
-    , ( "whitespace between elements"
-      , """[
+    makeValueTests "array values"
+        Toml.Array
+        [ ( "empty array"
+          , "[]"
+          , Just Toml.AEmpty
+          )
+        , ( "array of bools"
+          , "[true, false, false]"
+          , Just (Toml.ABool (Array.fromList [ True, False, False ]))
+          )
+        , ( "array of ints"
+          , "[1, 2, 3]"
+          , Just (Toml.AInt (Array.fromList [ 1, 2, 3 ]))
+          )
+        , ( "no mixed arrays"
+          , "[true, 1]"
+          , Nothing
+          )
+        , ( "whitespace between elements"
+          , """[
    "foo",
    "bar" ,
    "baz"
-]
-      """
-      , Just (Toml.Array (Toml.AString (Array.fromList [ "foo", "bar", "baz" ])))
-      )
-    , ( "array of arrays"
-      , "[[], []]"
-      , Just (Toml.Array (Toml.AArray (Array.fromList [ Toml.AEmpty, Toml.AEmpty ])))
-      )
-    , ( "mixed array of arrays"
-      , "[[], [true], [1, 2, 3]]"
-      , Just
-            (Toml.Array
+]"""
+          , Just (Toml.AString (Array.fromList [ "foo", "bar", "baz" ]))
+          )
+        , ( "array of arrays"
+          , "[[], []]"
+          , Just (Toml.AArray (Array.fromList [ Toml.AEmpty, Toml.AEmpty ]))
+          )
+        , ( "mixed array of arrays"
+          , "[[], [true], [1, 2, 3]]"
+          , Just
                 (Toml.AArray
                     (Array.fromList
                         [ Toml.AEmpty
@@ -279,15 +279,42 @@ arrayValues =
                         ]
                     )
                 )
-            )
-      )
-    , ( "Trailing comma"
-      , "[1, 2, ]"
-      , Just (Toml.Array (Toml.AInt (Array.fromList [ 1, 2 ])))
-      )
-    ]
-        |> List.map makeValueTest
-        |> describe "array values"
+          )
+        , ( "Trailing comma"
+          , "[1, 2, ]"
+          , Just (Toml.AInt (Array.fromList [ 1, 2 ]))
+          )
+        , ( "Trailing comma with newline"
+          , """[
+  true,
+]"""
+          , Just (Toml.ABool (Array.fromList [ True ]))
+          )
+        , ( "array of datetimes"
+          , """[1987-07-05T17:45:00Z] """
+          , Just
+                (Toml.ADateTime
+                    (Array.fromList
+                        [ { date = { year = 1987, month = 7, day = 5 }
+                          , time = { hours = 17, minutes = 45, seconds = 0 }
+                          , offset = { hours = 0, minutes = 0 }
+                          }
+                        ]
+                    )
+                )
+          )
+        , ( "array of tables"
+          , "[{ \"a\" = 1 }, { \"b\" = 2 }]"
+          , Just
+                (Toml.ATable
+                    (Array.fromList
+                        [ doc [ ( "a", Toml.Int 1 ) ]
+                        , doc [ ( "b", Toml.Int 2 ) ]
+                        ]
+                    )
+                )
+          )
+        ]
 
 
 localDateVal : Test
@@ -418,6 +445,60 @@ key.child2 = 'child 2'
                           )
                         ]
         ]
+
+
+tables : Test
+tables =
+    [ ( "simple table"
+      , """
+[foo]
+bar = true
+      """
+      , Just
+            [ ( "foo"
+              , table [ ( "bar", Toml.Bool True ) ]
+              )
+            ]
+      )
+    ]
+        |> List.map makeTest
+        |> describe "table tests"
+
+
+inlineTableVal : Test
+inlineTableVal =
+    makeValueTests "inline table values"
+        table
+        [ ( "empty"
+          , "{}"
+          , Just []
+          )
+        , ( "single pair"
+          , "{ foo = true }"
+          , Just [ ( "foo", Toml.Bool True ) ]
+          )
+        , ( "multiple pairs"
+          , "{foo = 1, bar = \"hello\"}"
+          , Just
+                [ ( "foo", Toml.Int 1 )
+                , ( "bar", Toml.String "hello" )
+                ]
+          )
+        ]
+
+
+arrayOfTables : Test
+arrayOfTables =
+    [ ( "single entry"
+      , """
+[[a]]
+b = true
+     """
+      , Just [ ( "a", Toml.Array (Toml.ATable (Array.fromList [ doc [ ( "b", Toml.Bool True ) ] ])) ) ]
+      )
+    ]
+        |> List.map makeTest
+        |> describe "array of tables tests"
 
 
 

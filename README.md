@@ -20,7 +20,7 @@
 - [x] arrays
 - [x] trailing commas
 - [ ] inline tables
-- [ ] tables
+- [x] tables
 - [ ] array of tables
 - [x] dates, localdates, time, ...
 

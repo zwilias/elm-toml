@@ -35,9 +35,7 @@ import Toml.Calendar as Calendar
 -}
 parse : String -> Result Parser.Error Toml.Document
 parse input =
-    input
-        |> Parser.run (document emptyAcc)
-        |> Result.map .final
+    Parser.run (document emptyAcc) input
 
 
 
@@ -71,11 +69,20 @@ emptyAcc =
     }
 
 
+freshAcc : Key -> Bool -> Toml.Document -> Acc
+freshAcc ( x, xs ) isArray doc =
+    { final = doc
+    , current = Dict.empty
+    , context = x :: xs
+    , isArray = isArray
+    }
+
+
 
 -- Parsing the document
 
 
-document : Acc -> Parser Acc
+document : Acc -> Parser Toml.Document
 document acc =
     succeed identity
         |. ws
@@ -104,9 +111,9 @@ commit acc entry =
                 Err e ->
                     fail e
 
-        Header isArray k ->
-            -- TODO: finalize previous stuff
-            succeed acc
+        Header isArray key ->
+            finalize acc
+                |> Parser.map (freshAcc key isArray)
 
 
 addKVPair : Key -> Toml.Value -> Toml.Document -> Result String Toml.Document
@@ -147,34 +154,59 @@ existingKey key doc =
     Dict.member key doc
 
 
-finalize : Acc -> Parser Acc
+finalize : Acc -> Parser Toml.Document
 finalize acc =
     case acc.context of
         [] ->
-            succeed
-                { acc
-                    | final = Dict.union acc.final acc.current
-                    , current = Dict.empty
-                    , context = []
-                    , isArray = False
-                }
+            succeed (Dict.union acc.final acc.current)
 
         k :: rest ->
             if acc.isArray then
-                fail "no support for array tables yet"
+                appendDoc ( k, rest ) acc.current acc.final
+                    |> result fail succeed
             else
-                case addKVPair ( k, rest ) (Toml.Table acc.current) acc.final of
-                    Ok v ->
-                        succeed
-                            { acc
-                                | final = v
-                                , current = Dict.empty
-                                , context = []
-                                , isArray = False
-                            }
+                addKVPair ( k, rest ) (Toml.Table acc.current) acc.final
+                    |> result fail succeed
 
-                    Err e ->
-                        fail e
+
+appendDoc : Key -> Toml.Document -> Toml.Document -> Result String Toml.Document
+appendDoc ( k, rest ) docToAdd container =
+    case rest of
+        [] ->
+            case Dict.get k container of
+                Just (Toml.Array (Toml.ATable v)) ->
+                    Array.push docToAdd v
+                        |> Toml.ATable
+                        |> Toml.Array
+                        |> (\v ->
+                                Dict.insert k v container
+                           )
+                        |> Ok
+
+                Just _ ->
+                    Err "Target is not an array"
+
+                Nothing ->
+                    Array.push docToAdd Array.empty
+                        |> Toml.ATable
+                        |> Toml.Array
+                        |> (\v ->
+                                Dict.insert k v container
+                           )
+                        |> Ok
+
+        x :: xs ->
+            case Dict.get k container of
+                Just (Toml.Table t) ->
+                    appendDoc ( x, xs ) docToAdd t
+                        |> Result.map (\v -> Dict.insert k (Toml.Table v) container)
+
+                Nothing ->
+                    appendDoc ( x, xs ) docToAdd Dict.empty
+                        |> Result.map (\v -> Dict.insert k (Toml.Table v) container)
+
+                Just _ ->
+                    Err "Target is not a table"
 
 
 
@@ -186,7 +218,9 @@ parseEntry =
     oneOf
         [ map (\_ -> Empty) comment
         , map (\_ -> Empty) eol
-        , map KVPair kvPair
+        , map (Header True) arrayOfTablesHeader
+        , map (Header False) tableHeader
+        , map KVPair (lazy (\_ -> kvPair)) |. eolOrComment
         ]
 
 
@@ -204,6 +238,28 @@ eol =
     oneOf [ ignore oneOrMore ((==) '\n'), end ]
 
 
+arrayOfTablesHeader : Parser Key
+arrayOfTablesHeader =
+    header "[[" "]]"
+
+
+tableHeader : Parser Key
+tableHeader =
+    header "[" "]"
+
+
+header : String -> String -> Parser Key
+header open close =
+    succeed identity
+        |. symbol open
+        |. ws
+        |= key
+        |. ws
+        |. symbol close
+        |. ws
+        |. eolOrComment
+
+
 kvPair : Parser ( Key, Toml.Value )
 kvPair =
     inContext "key value pair" <|
@@ -211,8 +267,7 @@ kvPair =
             |= key
             |. symbol "="
             |. ws
-            |= value
-            |. eolOrComment
+            |= lazy (\_ -> value)
 
 
 eolOrComment : Parser ()
@@ -295,7 +350,7 @@ value =
             , map Toml.Float float
             , map Toml.Int int
             , map Toml.Array array
-            , map Toml.Table table
+            , map Toml.Table (lazy (\_ -> table))
             ]
             |. ws
 
@@ -306,11 +361,12 @@ value =
 
 localDate : Parser Calendar.Date
 localDate =
-    succeed Calendar.Date
-        |= delayedCommitMap (\year _ -> year) (dtDigits (Exactly 4)) (symbol "-")
-        |= dtDigits (Exactly 2)
-        |. symbol "-"
-        |= dtDigits (Exactly 2)
+    inContext "local date" <|
+        succeed Calendar.Date
+            |= delayedCommitMap (\year _ -> year) (dtDigits (Exactly 4)) (symbol "-")
+            |= dtDigits (Exactly 2)
+            |. symbol "-"
+            |= dtDigits (Exactly 2)
 
 
 digits : Count -> Parser String
@@ -330,11 +386,12 @@ dtDigits count =
 
 localTime : Parser Calendar.Time
 localTime =
-    succeed Calendar.Time
-        |= delayedCommitMap (\hours _ -> hours) (dtDigits (Exactly 2)) (symbol ":")
-        |= dtDigits (Exactly 2)
-        |. symbol ":"
-        |= seconds
+    inContext "local time" <|
+        succeed Calendar.Time
+            |= delayedCommitMap (\hours _ -> hours) (dtDigits (Exactly 2)) (symbol ":")
+            |= dtDigits (Exactly 2)
+            |. symbol ":"
+            |= seconds
 
 
 seconds : Parser Float
@@ -360,11 +417,12 @@ maybeFractionalSeconds integerPart =
 
 localDateTime : Parser Calendar.LocalDateTime
 localDateTime =
-    succeed Calendar.LocalDateTime
-        |= delayedCommitMap (\date _ -> date)
-            localDate
-            (oneOf [ symbol "t", symbol "T", symbol " " ])
-        |= localTime
+    inContext "local datetime" <|
+        succeed Calendar.LocalDateTime
+            |= delayedCommitMap (\date _ -> date)
+                localDate
+                (oneOf [ symbol "t", symbol "T", symbol " " ])
+            |= localTime
 
 
 
@@ -373,12 +431,13 @@ localDateTime =
 
 dateTime : Parser Calendar.DateTime
 dateTime =
-    delayedCommitMap
-        (\{ date, time } offset ->
-            { date = date, time = time, offset = offset }
-        )
-        localDateTime
-        offset
+    inContext "datetime" <|
+        delayedCommitMap
+            (\{ date, time } offset ->
+                { date = date, time = time, offset = offset }
+            )
+            localDateTime
+            offset
 
 
 offset : Parser Calendar.Offset
@@ -728,11 +787,16 @@ array =
             |. symbol "["
             |. arrWs
             |= oneOf
-                [ andThen (start Toml.AString string) string
-                , andThen (start Toml.ABool bool) bool
-                , andThen (start Toml.AFloat float) float
-                , andThen (start Toml.AInt int) int
-                , andThen (start Toml.AArray self) self
+                [ start Toml.AString string
+                , start Toml.ABool bool
+                , start Toml.ADateTime dateTime
+                , start Toml.ALocalDateTime localDateTime
+                , start Toml.ALocalDate localDate
+                , start Toml.ALocalTime localTime
+                , start Toml.AFloat float
+                , start Toml.AInt int
+                , start Toml.ATable (lazy (\_ -> table))
+                , start Toml.AArray self
                 , succeed Toml.AEmpty
                 ]
             |. arrWs
@@ -743,10 +807,13 @@ array =
 start :
     (Array a -> Toml.ArrayValue)
     -> Parser a
-    -> a
     -> Parser Toml.ArrayValue
-start toArrVal elem first =
-    rest toArrVal elem (Array.push first Array.empty)
+start toArrVal elem =
+    elem
+        |> andThen
+            (\first ->
+                rest toArrVal elem (Array.push first Array.empty)
+            )
 
 
 rest :
@@ -785,7 +852,51 @@ arrWs =
 table : Parser Toml.Document
 table =
     inContext "inline table" <|
-        fail "TODO"
+        succeed identity
+            |. symbol "{"
+            |. ws
+            |= lazy (\_ -> tablePairs)
+            |. symbol "}"
+            |. ws
+
+
+tablePairs : Parser Toml.Document
+tablePairs =
+    oneOf
+        [ lazy (\_ -> kvPair)
+            |. ws
+            |> andThen
+                (\( k, v ) ->
+                    case addKVPair k v Dict.empty of
+                        Err e ->
+                            fail e
+
+                        Ok doc ->
+                            nextPairs doc
+                )
+        , succeed Dict.empty
+        ]
+
+
+nextPairs : Toml.Document -> Parser Toml.Document
+nextPairs doc =
+    oneOf
+        [ succeed identity
+            |. symbol ","
+            |. ws
+            |= lazy (\_ -> kvPair)
+            |. ws
+            |> andThen
+                (\( k, v ) ->
+                    case addKVPair k v doc of
+                        Err e ->
+                            fail e
+
+                        Ok newDoc ->
+                            nextPairs newDoc
+                )
+        , succeed doc
+        ]
 
 
 
