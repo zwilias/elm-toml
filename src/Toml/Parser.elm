@@ -15,6 +15,7 @@ import Parser
         , end
         , fail
         , ignore
+        , ignoreUntil
         , inContext
         , keep
         , keyword
@@ -23,6 +24,7 @@ import Parser
         , oneOf
         , oneOrMore
         , repeat
+        , source
         , succeed
         , symbol
         , zeroOrMore
@@ -973,7 +975,27 @@ nextPairs doc =
 string : Parser String
 string =
     inContext "string" <|
-        oneOf [ literalString, regularString ]
+        oneOf
+            [ multilineLiteralString
+            , literalString
+            , regularString
+            ]
+
+
+multilineLiteralString : Parser String
+multilineLiteralString =
+    inContext "multiline literal string" <|
+        succeed identity
+            |. symbol "'''"
+            |. optional (symbol "\n")
+            |= until "'''"
+
+
+until : String -> Parser String
+until marker =
+    ignoreUntil marker
+        |> source
+        |> map (String.slice 0 (negate (String.length marker)))
 
 
 literalString : Parser String

@@ -642,6 +642,18 @@ stringValues =
           , "\"\\U000003B4\""
           , Just "δ"
           )
+        , ( "multiline literal string"
+          , "'''foo'''"
+          , Just "foo"
+          )
+        , ( "with newlines"
+          , "'''foo\n  bar\n'''"
+          , Just "foo\n  bar\n"
+          )
+        , ( "ignore first newline"
+          , "'''\nfoo'''"
+          , Just "foo"
+          )
         ]
 
 
