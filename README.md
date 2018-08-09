@@ -8,8 +8,8 @@
 - [x] dotted keys
 - [x] basic strings
 - [x] literal strings
-- [ ] multiline basic strings
-- [ ] multiline literal strings
+- [x] multiline basic strings
+- [x] multiline literal strings
 - [x] comments
 - [x] integers
 - [x] fractional floats

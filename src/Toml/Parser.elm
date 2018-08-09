@@ -399,7 +399,7 @@ singleQuotedKey =
 
 doublyQuotedKey : Parser String
 doublyQuotedKey =
-    regularString
+    basicString
 
 
 
@@ -977,8 +977,9 @@ string =
     inContext "string" <|
         oneOf
             [ multilineLiteralString
+            , multilineBasicString
             , literalString
-            , regularString
+            , basicString
             ]
 
 
@@ -1006,8 +1007,56 @@ literalString =
         |. symbol "'"
 
 
-regularString : Parser String
-regularString =
+multilineBasicString : Parser String
+multilineBasicString =
+    succeed identity
+        |. symbol "\"\"\""
+        |. optional (symbol "\n")
+        |= multilineBasicStringContent ""
+
+
+multilineBasicStringContent : String -> Parser String
+multilineBasicStringContent acc =
+    let
+        {- This little trick allows us to piece the parts together. -}
+        continue : String -> Parser String
+        continue string =
+            multilineBasicStringContent <| acc ++ string
+    in
+    oneOf
+        [ lineEndingBackslash |> andThen (\_ -> continue "")
+        , succeed acc |. symbol "\"\"\""
+        , {- This means that characters like `\n` must be escaped as `\\n`
+             So a literal backslash followed by a literal `n`.
+          -}
+          escapedControlCharacter |> andThen continue
+
+        {- Arbitrary unicode can be embedded using `\uXXXX` where the `X`s form
+           a valid hexadecimal sequence.
+        -}
+        , escapedUnicode |> andThen continue
+
+        {- Finally, we have the rest of unicode, specifically disallowing certain
+           things: control characters, literal `\` and literal `"`.
+        -}
+        , nonControlCharacters |> andThen continue
+
+        {- If none of the above produce anything, we succeed with what we've
+           accumulated so far.
+        -}
+        , succeed acc
+        ]
+
+
+lineEndingBackslash : Parser ()
+lineEndingBackslash =
+    delayedCommit (symbol "\\" |. ws) eol
+        |. repeat zeroOrMore (oneOf [ map (always ()) eol, reqWs ])
+        |> map (always ())
+
+
+basicString : Parser String
+basicString =
     succeed identity
         |. symbol "\""
         |= regularStringContent ""
