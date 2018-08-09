@@ -19,9 +19,9 @@
 - [x] booleans
 - [x] arrays
 - [x] trailing commas
-- [ ] inline tables
+- [x] inline tables
 - [x] tables
-- [ ] array of tables
+- [x] array of tables
 - [x] dates, localdates, time, ...
 
 ## Decoder
