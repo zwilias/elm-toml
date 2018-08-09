@@ -36,7 +36,7 @@ import Toml.Calendar as Calendar
 -}
 parse : String -> Result Parser.Error Toml.Document
 parse input =
-    Parser.run (document emptyAcc) input
+    Parser.run document input
 
 
 
@@ -56,7 +56,7 @@ type alias Acc =
 
 
 type Entry
-    = Empty
+    = Empty String
     | KVPair ( Key, Toml.Value )
     | Header Bool Key
 
@@ -83,8 +83,14 @@ freshAcc ( x, xs ) isArray doc =
 -- Parsing the document
 
 
-document : Acc -> Parser Toml.Document
-document acc =
+document : Parser Toml.Document
+document =
+    accumulateDoc emptyAcc
+        |> andThen finalize
+
+
+accumulateDoc : Acc -> Parser Acc
+accumulateDoc acc =
     succeed identity
         |. ws
         |= parseEntry
@@ -92,8 +98,8 @@ document acc =
         |> andThen
             (\newAcc ->
                 oneOf
-                    [ end |> andThen (\_ -> finalize newAcc)
-                    , lazy (\_ -> document newAcc)
+                    [ end |> map (always newAcc)
+                    , lazy (\_ -> accumulateDoc newAcc)
                     ]
             )
 
@@ -101,7 +107,7 @@ document acc =
 commit : Acc -> Entry -> Parser Acc
 commit acc entry =
     case entry of
-        Empty ->
+        Empty _ ->
             succeed acc
 
         KVPair ( key, val ) ->
@@ -166,8 +172,47 @@ finalize acc =
                 appendDoc ( k, rest ) acc.current acc.final
                     |> result fail succeed
             else
-                addKVPair ( k, rest ) (Toml.Table acc.current) acc.final
+                mergeDoc ( k, rest ) acc.current acc.final
                     |> result fail succeed
+
+
+mergeDoc : Key -> Toml.Document -> Toml.Document -> Result String Toml.Document
+mergeDoc ( k, rest ) docToAdd container =
+    case rest of
+        [] ->
+            case Dict.get k container of
+                Just (Toml.Table t) ->
+                    Dict.insert k (Toml.Table (Dict.union t docToAdd)) container
+                        |> Ok
+
+                Just _ ->
+                    Err "merging into a non-table"
+
+                Nothing ->
+                    Ok <| Dict.insert k (Toml.Table docToAdd) container
+
+        x :: rest ->
+            case Dict.get k container of
+                Just (Toml.Table t) ->
+                    mergeDoc ( x, rest ) docToAdd t
+                        |> Result.map (\newT -> Dict.insert k (Toml.Table newT) container)
+
+                Nothing ->
+                    mergeDoc ( x, rest ) docToAdd Dict.empty
+                        |> Result.map (\newT -> Dict.insert k (Toml.Table newT) container)
+
+                Just (Toml.Array (Toml.ATable v)) ->
+                    case Array.get (Array.length v - 1) v of
+                        Just t ->
+                            mergeDoc ( x, rest ) docToAdd t
+                                |> Result.map (\newDoc -> Array.set (Array.length v - 1) newDoc v)
+                                |> Result.map (\newArr -> Dict.insert k (Toml.Array (Toml.ATable newArr)) container)
+
+                        Nothing ->
+                            Err "empty array?"
+
+                Just _ ->
+                    Err "Adding to a non-table"
 
 
 appendDoc : Key -> Toml.Document -> Toml.Document -> Result String Toml.Document
@@ -179,9 +224,7 @@ appendDoc ( k, rest ) docToAdd container =
                     Array.push docToAdd v
                         |> Toml.ATable
                         |> Toml.Array
-                        |> (\v ->
-                                Dict.insert k v container
-                           )
+                        |> (\v -> Dict.insert k v container)
                         |> Ok
 
                 Just _ ->
@@ -191,10 +234,33 @@ appendDoc ( k, rest ) docToAdd container =
                     Array.push docToAdd Array.empty
                         |> Toml.ATable
                         |> Toml.Array
-                        |> (\v ->
-                                Dict.insert k v container
-                           )
+                        |> (\v -> Dict.insert k v container)
                         |> Ok
+
+        [ x ] ->
+            case Dict.get k container of
+                Just (Toml.Array (Toml.ATable v)) ->
+                    case Array.get (Array.length v - 1) v of
+                        Just t ->
+                            appendDoc ( x, [] ) docToAdd t
+                                |> Result.map (\newDoc -> Array.set (Array.length v - 1) newDoc v)
+                                |> Result.map (\newTable -> Dict.insert k (Toml.Array (Toml.ATable newTable)) container)
+
+                        Nothing ->
+                            appendDoc ( x, [] ) docToAdd Dict.empty
+                                |> Result.map (\newDoc -> Array.set (Array.length v - 1) newDoc v)
+                                |> Result.map (\newTable -> Dict.insert k (Toml.Array (Toml.ATable newTable)) container)
+
+                Just (Toml.Table t) ->
+                    appendDoc ( x, [] ) docToAdd t
+                        |> Result.map (\v -> Dict.insert k (Toml.Table v) container)
+
+                Nothing ->
+                    appendDoc ( x, [] ) docToAdd Dict.empty
+                        |> Result.map (\v -> Dict.insert k (Toml.Table v) container)
+
+                Just _ ->
+                    Err "Target is not a table"
 
         x :: xs ->
             case Dict.get k container of
@@ -217,8 +283,8 @@ appendDoc ( k, rest ) docToAdd container =
 parseEntry : Parser Entry
 parseEntry =
     oneOf
-        [ map (\_ -> Empty) comment
-        , map (\_ -> Empty) eol
+        [ map Empty comment
+        , map Empty eol
         , map (Header True) arrayOfTablesHeader
         , map (Header False) tableHeader
         , map KVPair (lazy (\_ -> kvPair)) |. eolOrComment
@@ -234,9 +300,9 @@ comment =
             |. eol
 
 
-eol : Parser ()
+eol : Parser String
 eol =
-    oneOf [ ignore oneOrMore ((==) '\n'), end ]
+    oneOf [ keep oneOrMore ((==) '\n'), succeed "end" |. end ]
 
 
 arrayOfTablesHeader : Parser Key
@@ -271,11 +337,11 @@ kvPair =
             |= lazy (\_ -> value)
 
 
-eolOrComment : Parser ()
+eolOrComment : Parser String
 eolOrComment =
     oneOf
         [ eol
-        , map (\_ -> ()) comment
+        , comment
         ]
 
 
@@ -842,7 +908,7 @@ arraySep =
 
 arrWs : Parser ()
 arrWs =
-    repeat oneOrMore (oneOf [ eolOrComment, reqWs ])
+    repeat oneOrMore (oneOf [ map (always ()) eolOrComment, reqWs ])
         |> optional
 
 

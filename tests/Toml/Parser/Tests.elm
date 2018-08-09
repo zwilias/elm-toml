@@ -394,57 +394,167 @@ dateTimeVal =
 
 structural : Test
 structural =
-    describe "structural checks"
-        [ test "skips empty lines" <|
-            \_ ->
-                """
+    [ ( "skips empty lines"
+      , """
 key1 = 'val1'
 
 key2 = 'val2'
-       """
-                    |> parse
-                    |> succeed
-                        [ ( "key1", Toml.String "val1" )
-                        , ( "key2", Toml.String "val2" )
-                        ]
-        , test "skips comments between pairs" <|
-            \_ ->
-                """
+        """
+      , Just
+            [ ( "key1", Toml.String "val1" )
+            , ( "key2", Toml.String "val2" )
+            ]
+      )
+    , ( "skips comments between pairs"
+      , """
 key1 = 'val1'
 
 # This is a comment
        # This is an indented comment
 key2 = 'val2'
        """
-                    |> parse
-                    |> succeed
-                        [ ( "key1", Toml.String "val1" )
-                        , ( "key2", Toml.String "val2" )
-                        ]
-        , test "Fail: adding to a non-table" <|
-            \_ ->
-                """
+      , Just
+            [ ( "key1", Toml.String "val1" )
+            , ( "key2", Toml.String "val2" )
+            ]
+      )
+    , ( "Fail: adding to a non-table"
+      , """
 key = 'not a table'
 key.child = 'nope'
-            """
-                    |> parse
-                    |> fail
-        , test "Nested friends" <|
-            \_ ->
-                """
+        """
+      , Nothing
+      )
+    , ( "Nested friends"
+      , """
 key.child1 = 'child 1'
 key.child2 = 'child 2'
-             """
-                    |> parse
-                    |> succeed
-                        [ ( "key"
-                          , table
-                                [ ( "child1", Toml.String "child 1" )
-                                , ( "child2", Toml.String "child 2" )
+        """
+      , Just
+            [ ( "key"
+              , table
+                    [ ( "child1", Toml.String "child 1" )
+                    , ( "child2", Toml.String "child 2" )
+                    ]
+              )
+            ]
+      )
+    , ( "keys with dots and tables"
+      , """
+plain = 1
+"with.dot" = 2
+
+[plain_table]
+plain = 3
+"with.dot" = 4
+
+[table.withdot]
+plain = 5
+"key.with.dots" = 6
+        """
+      , Just
+            [ ( "plain", Toml.Int 1 )
+            , ( "with.dot", Toml.Int 2 )
+            , ( "plain_table"
+              , table
+                    [ ( "plain", Toml.Int 3 )
+                    , ( "with.dot", Toml.Int 4 )
+                    ]
+              )
+            , ( "table"
+              , table
+                    [ ( "withdot"
+                      , table
+                            [ ( "plain", Toml.Int 5 )
+                            , ( "key.with.dots", Toml.Int 6 )
+                            ]
+                      )
+                    ]
+              )
+            ]
+      )
+    , ( "tables in array of tables"
+      , """
+[[albums]]
+name = "Born to Run"
+
+  [[albums.songs]]
+  name = "Jungleland"
+
+  [[albums.songs]]
+  name = "Meeting Across the River"
+
+[[albums]]
+name = "Born in the USA"
+
+  [[albums.songs]]
+  name = "Glory Days"
+
+  [[albums.songs]]
+  name = "Dancing in the Dark"
+        """
+      , Just
+            [ ( "albums"
+              , Toml.Array
+                    (Toml.ATable
+                        (Array.fromList
+                            [ doc
+                                [ ( "name", Toml.String "Born to Run" )
+                                , ( "songs"
+                                  , tableArr
+                                        [ doc [ ( "name", Toml.String "Jungleland" ) ]
+                                        , doc [ ( "name", Toml.String "Meeting Across the River" ) ]
+                                        ]
+                                  )
+                                ]
+                            , doc
+                                [ ( "name", Toml.String "Born in the USA" )
+                                , ( "songs"
+                                  , tableArr
+                                        [ doc [ ( "name", Toml.String "Glory Days" ) ]
+                                        , doc [ ( "name", Toml.String "Dancing in the Dark" ) ]
+                                        ]
+                                  )
+                                ]
+                            ]
+                        )
+                    )
+              )
+            ]
+      )
+    , ( "table array in a table array"
+      , """
+[[a]]
+    [[a.b]]
+        [a.b.c]
+            d = "val0"
+    [[a.b]]
+        [a.b.c]
+            d = "val1"
+        """
+      , Just
+            [ ( "a"
+              , tableArr
+                    [ doc
+                        [ ( "b"
+                          , tableArr
+                                [ doc [ ( "c", table [ ( "d", Toml.String "val0" ) ] ) ]
+                                , doc [ ( "c", table [ ( "d", Toml.String "val1" ) ] ) ]
                                 ]
                           )
                         ]
-        ]
+                    ]
+              )
+            ]
+      )
+    ]
+        |> List.map makeTest
+        |> describe "structural tests"
+
+
+tableArr : List Toml.Document -> Toml.Value
+tableArr docs =
+    Toml.Array (Toml.ATable (Array.fromList docs))
 
 
 tables : Test
@@ -457,6 +567,25 @@ bar = true
       , Just
             [ ( "foo"
               , table [ ( "bar", Toml.Bool True ) ]
+              )
+            ]
+      )
+    , ( "parent-table after define"
+      , """
+[a.b.c]
+answer = 42
+
+[a]
+answer = 12
+"""
+      , Just
+            [ ( "a"
+              , table
+                    [ ( "answer", Toml.Int 12 )
+                    , ( "b"
+                      , table [ ( "c", table [ ( "answer", Toml.Int 42 ) ] ) ]
+                      )
+                    ]
               )
             ]
       )
@@ -561,8 +690,13 @@ table =
 
 
 succeed : List ( String, Toml.Value ) -> Result e Toml.Document -> Expectation
-succeed v =
-    Expect.equal (Ok (doc v))
+succeed v res =
+    case res of
+        Ok t ->
+            Expect.equalDicts (doc v) t
+
+        Err e ->
+            Expect.fail (toString e)
 
 
 fail : Result e v -> Expectation
