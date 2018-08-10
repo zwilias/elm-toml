@@ -1,29 +1,13 @@
-# TODO
+# `elm-toml`
+> Parsing TOML in Elm
 
-## Parser
+![Build Status](https://travis-ci.org/zwilias/elm-toml.svg?branch=master)](https://travis-ci.org/zwilias/elm-toml)
 
-- [x] bare keys
-- [x] single quoted keys
-- [x] doubly quoted keys
-- [x] dotted keys
-- [x] basic strings
-- [x] literal strings
-- [x] multiline basic strings
-- [x] multiline literal strings
-- [x] comments
-- [x] integers
-- [x] fractional floats
-- [x] exp floats
-- [x] exp fractional floats
-- [x] infinity, nan
-- [x] booleans
-- [x] arrays
-- [x] trailing commas
-- [x] inline tables
-- [x] tables
-- [x] array of tables
-- [x] dates, localdates, time, ...
+This library attempts to model [TOML](https://github.com/toml-lang/toml) in Elm,
+providing a means to parse a TOML document into an Elm datastructure.
 
-## Decoder
+## Usage
 
-all the things
+## Contributing
+
+## License
