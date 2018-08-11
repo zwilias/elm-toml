@@ -547,19 +547,39 @@ name = "Born in the USA"
               )
             ]
       )
-    ]
-        |> List.map makeTest
-        |> describe "structural tests"
-
-
-tableArr : List Toml.Document -> Toml.Value
-tableArr docs =
-    Toml.Array (Toml.ATable (Array.fromList docs))
-
-
-tables : Test
-tables =
-    [ ( "simple table"
+    , ( "repeated nested merges"
+      , """
+[foo.bar.baz1]
+[foo.bar.baz2]
+        """
+      , Just
+            [ ( "foo"
+              , table
+                    [ ( "bar"
+                      , table
+                            [ ( "baz1", table [] )
+                            , ( "baz2", table [] )
+                            ]
+                      )
+                    ]
+              )
+            ]
+      )
+    , ( "merging into a non-table"
+      , """
+key = "value"
+[key]
+        """
+      , Nothing
+      )
+    , ( "adding to a non-table"
+      , """
+key = "value"
+[key.foo]
+        """
+      , Nothing
+      )
+    , ( "simple table"
       , """
 [foo]
 bar = true
@@ -589,9 +609,42 @@ answer = 12
               )
             ]
       )
+    , ( "nested into array"
+      , """
+[a]
+[[a.bar]]
+key = "first"
+[[a.foo.bar]]
+key = "other"
+        """
+      , Just
+            [ ( "a"
+              , table
+                    [ ( "bar"
+                      , tableArr [ doc [ ( "key", Toml.String "first" ) ] ]
+                      )
+                    , ( "foo"
+                      , table [ ( "bar", tableArr [ doc [ ( "key", Toml.String "other" ) ] ] ) ]
+                      )
+                    ]
+              )
+            ]
+      )
+    , ( "single entry"
+      , """
+[[a]]
+b = true
+     """
+      , Just [ ( "a", Toml.Array (Toml.ATable (Array.fromList [ doc [ ( "b", Toml.Bool True ) ] ])) ) ]
+      )
     ]
         |> List.map makeTest
-        |> describe "table tests"
+        |> describe "structural tests"
+
+
+tableArr : List Toml.Document -> Toml.Value
+tableArr docs =
+    Toml.Array (Toml.ATable (Array.fromList docs))
 
 
 inlineTableVal : Test
@@ -613,21 +666,11 @@ inlineTableVal =
                 , ( "bar", Toml.String "hello" )
                 ]
           )
+        , ( "reused key"
+          , "{foo = 1, foo = 2}"
+          , Nothing
+          )
         ]
-
-
-arrayOfTables : Test
-arrayOfTables =
-    [ ( "single entry"
-      , """
-[[a]]
-b = true
-     """
-      , Just [ ( "a", Toml.Array (Toml.ATable (Array.fromList [ doc [ ( "b", Toml.Bool True ) ] ])) ) ]
-      )
-    ]
-        |> List.map makeTest
-        |> describe "array of tables tests"
 
 
 stringValues : Test
@@ -653,6 +696,10 @@ stringValues =
         , ( "ignore first newline"
           , "'''\nfoo'''"
           , Just "foo"
+          )
+        , ( "whitespace escaping backslash"
+          , "\"\"\"foo\\\n  \n  bar\"\"\""
+          , Just "foobar"
           )
         ]
 

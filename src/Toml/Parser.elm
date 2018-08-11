@@ -242,16 +242,11 @@ appendDoc ( k, rest ) docToAdd container =
         [ x ] ->
             case Dict.get k container of
                 Just (Toml.Array (Toml.ATable v)) ->
-                    case Array.get (Array.length v - 1) v of
-                        Just t ->
-                            appendDoc ( x, [] ) docToAdd t
-                                |> Result.map (\newDoc -> Array.set (Array.length v - 1) newDoc v)
-                                |> Result.map (\newTable -> Dict.insert k (Toml.Array (Toml.ATable newTable)) container)
-
-                        Nothing ->
-                            appendDoc ( x, [] ) docToAdd Dict.empty
-                                |> Result.map (\newDoc -> Array.set (Array.length v - 1) newDoc v)
-                                |> Result.map (\newTable -> Dict.insert k (Toml.Array (Toml.ATable newTable)) container)
+                    Array.get (Array.length v - 1) v
+                        |> Result.fromMaybe "Table arrays are non-empty"
+                        |> Result.andThen (appendDoc ( x, [] ) docToAdd)
+                        |> Result.map (\newDoc -> Array.set (Array.length v - 1) newDoc v)
+                        |> Result.map (\newTable -> Dict.insert k (Toml.Array (Toml.ATable newTable)) container)
 
                 Just (Toml.Table t) ->
                     appendDoc ( x, [] ) docToAdd t
