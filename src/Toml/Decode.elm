@@ -421,7 +421,7 @@ andThen toDecB (Decoder decoderFn) =
                     Err e
 
 
-{-| TODO
+{-| Combine 3 decoders.
 -}
 map3 :
     (a -> b -> c -> d)
@@ -434,7 +434,7 @@ map3 f decA decB decC =
         |> andMap decC
 
 
-{-| TODO
+{-| Combine 4 decoders.
 -}
 map4 :
     (a -> b -> c -> d -> e)
@@ -448,7 +448,7 @@ map4 f decA decB decC decD =
         |> andMap decD
 
 
-{-| TODO
+{-| Combine 5 decoders.
 -}
 map5 :
     (a -> b -> c -> d -> e -> f)
@@ -463,7 +463,7 @@ map5 f decA decB decC decD decE =
         |> andMap decE
 
 
-{-| TODO
+{-| Combine 6 decoders.
 -}
 map6 :
     (a -> b -> c -> d -> e -> f -> g)
@@ -479,7 +479,7 @@ map6 f decA decB decC decD decE decF =
         |> andMap decF
 
 
-{-| TODO
+{-| Combine 7 decoders.
 -}
 map7 :
     (a -> b -> c -> d -> e -> f -> g -> h)
@@ -496,7 +496,7 @@ map7 f decA decB decC decD decE decF decG =
         |> andMap decG
 
 
-{-| TODO
+{-| Combine 8 decoders.
 -}
 map8 :
     (a -> b -> c -> d -> e -> f -> g -> h -> i)
