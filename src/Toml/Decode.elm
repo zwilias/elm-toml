@@ -9,7 +9,6 @@ module Toml.Decode
         , at
         , bool
         , dateTime
-        , decodeDocument
         , decodeString
         , dict
         , fail
@@ -20,6 +19,7 @@ module Toml.Decode
         , list
         , localDate
         , localDateTime
+        , localTime
         , map
         , map2
         , map3
@@ -33,6 +33,35 @@ module Toml.Decode
         , succeed
         )
 
+{-| Decode a TOML string into an Elm datastructure.
+
+
+# Running
+
+@docs Decoder, decodeString
+
+
+# Primitive decoders
+
+@docs int, float, string, bool, localTime, localDate, localDateTime, dateTime
+
+
+# Navigating structure
+
+@docs field, at, dict, index, list
+
+
+# Building more complex decoders
+
+@docs succeed, fail, map, andThen, mapError, map2, andMap, map3, map4, map5, map6, map7, map8
+
+
+# Errors
+
+@docs Errors, Error, DecodeError
+
+-}
+
 import Array.Hamt as Array exposing (Array)
 import Dict exposing (Dict)
 import Parser
@@ -41,11 +70,15 @@ import Toml.Calendar as Calendar
 import Toml.Parser
 
 
+{-| TODO
+-}
 type Error e
     = ParseError Parser.Error
     | DecodeErrors (Errors e)
 
 
+{-| TODO
+-}
 type DecodeError e
     = Expected String Toml.Value
     | MissingIndex Int
@@ -55,14 +88,20 @@ type DecodeError e
     | Custom e
 
 
+{-| TODO
+-}
 type alias Errors e =
     ( DecodeError e, List (DecodeError e) )
 
 
+{-| TODO
+-}
 type Decoder e a
     = Decoder (Toml.Value -> Result (Errors e) a)
 
 
+{-| TODO
+-}
 decodeString : Decoder e a -> String -> Result (Error e) a
 decodeString decoder input =
     Toml.Parser.parse input
@@ -78,21 +117,29 @@ decodeDocument (Decoder decoderFn) doc =
     decoderFn (Toml.Table doc)
 
 
+{-| TODO
+-}
 succeed : a -> Decoder e a
 succeed v =
     Decoder <| \_ -> Ok v
 
 
+{-| TODO
+-}
 fail : e -> Decoder e v
 fail e =
     Decoder <| \_ -> Err ( Custom e, [] )
 
 
+{-| TODO
+-}
 map : (a -> b) -> Decoder e a -> Decoder e b
 map f (Decoder decoderFn) =
     Decoder (Result.map f << decoderFn)
 
 
+{-| TODO
+-}
 mapError : (e1 -> e2) -> Decoder e1 a -> Decoder e2 a
 mapError f (Decoder decoderFn) =
     Decoder (Result.mapError (mapErrors f) << decoderFn)
@@ -125,6 +172,8 @@ mapCustom f error =
             InField field (mapErrors f e)
 
 
+{-| TODO
+-}
 map2 : (a -> b -> c) -> Decoder e a -> Decoder e b -> Decoder e c
 map2 f (Decoder decA) (Decoder decB) =
     Decoder <|
@@ -143,11 +192,15 @@ map2 f (Decoder decA) (Decoder decB) =
                     Err e
 
 
+{-| TODO
+-}
 andMap : Decoder e a -> Decoder e (a -> b) -> Decoder e b
 andMap second first =
     map2 (<|) first second
 
 
+{-| TODO
+-}
 andThen : (a -> Decoder e b) -> Decoder e a -> Decoder e b
 andThen toDecB (Decoder decoderFn) =
     Decoder <|
@@ -164,6 +217,8 @@ andThen toDecB (Decoder decoderFn) =
                     Err e
 
 
+{-| TODO
+-}
 map3 :
     (a -> b -> c -> d)
     -> Decoder e a
@@ -175,6 +230,8 @@ map3 f decA decB decC =
         |> andMap decC
 
 
+{-| TODO
+-}
 map4 :
     (a -> b -> c -> d -> e)
     -> Decoder x a
@@ -187,6 +244,8 @@ map4 f decA decB decC decD =
         |> andMap decD
 
 
+{-| TODO
+-}
 map5 :
     (a -> b -> c -> d -> e -> f)
     -> Decoder x a
@@ -200,6 +259,8 @@ map5 f decA decB decC decD decE =
         |> andMap decE
 
 
+{-| TODO
+-}
 map6 :
     (a -> b -> c -> d -> e -> f -> g)
     -> Decoder x a
@@ -214,6 +275,8 @@ map6 f decA decB decC decD decE decF =
         |> andMap decF
 
 
+{-| TODO
+-}
 map7 :
     (a -> b -> c -> d -> e -> f -> g -> h)
     -> Decoder x a
@@ -229,6 +292,8 @@ map7 f decA decB decC decD decE decF decG =
         |> andMap decG
 
 
+{-| TODO
+-}
 map8 :
     (a -> b -> c -> d -> e -> f -> g -> h -> i)
     -> Decoder x a
@@ -245,6 +310,8 @@ map8 f decA decB decC decD decE decF decG decH =
         |> andMap decH
 
 
+{-| TODO
+-}
 string : Decoder e String
 string =
     Decoder <|
@@ -257,6 +324,8 @@ string =
                     expected "string" v
 
 
+{-| TODO
+-}
 int : Decoder e Int
 int =
     Decoder <|
@@ -269,6 +338,8 @@ int =
                     expected "int" v
 
 
+{-| TODO
+-}
 float : Decoder e Float
 float =
     Decoder <|
@@ -281,6 +352,8 @@ float =
                     expected "float" v
 
 
+{-| TODO
+-}
 bool : Decoder e Bool
 bool =
     Decoder <|
@@ -293,6 +366,8 @@ bool =
                     expected "bool" v
 
 
+{-| TODO
+-}
 localDate : Decoder e Calendar.Date
 localDate =
     Decoder <|
@@ -305,6 +380,8 @@ localDate =
                     expected "localDate" v
 
 
+{-| TODO
+-}
 localTime : Decoder e Calendar.Time
 localTime =
     Decoder <|
@@ -317,6 +394,8 @@ localTime =
                     expected "localTime" v
 
 
+{-| TODO
+-}
 localDateTime : Decoder e Calendar.LocalDateTime
 localDateTime =
     Decoder <|
@@ -329,6 +408,8 @@ localDateTime =
                     expected "localDateTime" v
 
 
+{-| TODO
+-}
 dateTime : Decoder e Calendar.DateTime
 dateTime =
     Decoder <|
@@ -341,6 +422,8 @@ dateTime =
                     expected "dateTime" v
 
 
+{-| TODO
+-}
 field : String -> Decoder e a -> Decoder e a
 field key (Decoder decoderFn) =
     Decoder <|
@@ -359,6 +442,8 @@ field key (Decoder decoderFn) =
                     expected "table" v
 
 
+{-| TODO
+-}
 dict : Decoder e a -> Decoder e (Dict String a)
 dict (Decoder fieldDecoder) =
     Decoder <|
@@ -374,6 +459,8 @@ dict (Decoder fieldDecoder) =
                     expected "table" v
 
 
+{-| TODO
+-}
 collectDict :
     String
     -> Result (Errors e) a
@@ -394,11 +481,15 @@ collectDict key res acc =
             Ok (Dict.insert key v vs)
 
 
+{-| TODO
+-}
 at : List String -> Decoder e a -> Decoder e a
 at fields dec =
     List.foldr field dec fields
 
 
+{-| TODO
+-}
 list : Decoder e a -> Decoder e (List a)
 list entryDecoder =
     Decoder <|
@@ -441,6 +532,8 @@ list entryDecoder =
                     expected "array" v
 
 
+{-| TODO
+-}
 index : Int -> Decoder e a -> Decoder e a
 index idx entryDecoder =
     Decoder <|
