@@ -72,14 +72,24 @@ import Toml.Calendar as Calendar
 import Toml.Parser
 
 
-{-| TODO
+{-| Decoding a string representing a TOML document may produce errors. Those
+will either be parse errors (represented by a `Parser.Error`) or error that
+occurred during the actual decoding process (represented by `DecodeErrors`).
 -}
 type Error e
     = ParseError Parser.Error
     | DecodeErrors (Errors e)
 
 
-{-| TODO
+{-| While decoding, these errors may be produced.
+
+Type mismatches, missing field, missing indices and custom errors (from `fail`)
+can occur. If those errors occur in the context of a field (through `field`,
+`at`, or `dict`) they are wrapped in `InField`. If the error occurs at a certain
+index in a list (through `list` or `index`), it will be wrapped in `AtIndex`.
+
+Type mismatches also carry the original value, for inspection.
+
 -}
 type DecodeError e
     = Expected String Toml.Value
@@ -91,19 +101,25 @@ type DecodeError e
     | Custom e
 
 
-{-| TODO
+{-| One or more `DecodeError`s.
 -}
 type alias Errors e =
     ( DecodeError e, List (DecodeError e) )
 
 
-{-| TODO
+{-| Represents a decoder, constructed from the functions in this module, that
+can be executed against a string representing a TOML document using
+`decodeString`.
 -}
 type Decoder e a
     = Decoder (Toml.Value -> Result (Errors e) a)
 
 
-{-| TODO
+{-| Run a `Decoder` against a string representing a TOML document.
+
+    decodeString (field "foo" string) "foo = 'bar'"
+    --> Ok "bar"
+
 -}
 decodeString : Decoder e a -> String -> Result (Error e) a
 decodeString decoder input =
@@ -120,28 +136,83 @@ decodeDocument (Decoder decoderFn) doc =
     decoderFn (Toml.Table doc)
 
 
-{-| TODO
+{-| Construct a `Decoder` that will always succeed (provided the TOML is valid)
+with the given value.
+
+    decodeString (succeed "hello world!") "foo = 'bar'"
+    --> Ok "hello world!"
+
+
+    "invalid document"
+        |> decodeString (succeed "nope")
+        |> Result.mapError (always "failure")
+    --> Err "failure"
+
 -}
 succeed : a -> Decoder e a
 succeed v =
     Decoder <| \_ -> Ok v
 
 
-{-| TODO
+{-| Construct a `Decoder` that will always fail (provided a valid TOML document)
+with the given value.
+
+Note that this needn't be a string: custom types are allowed, too!
+
+    type MyError
+        = MyError
+
+
+    "ok = true"
+        |> decodeString (fail MyError)
+    --> Err (DecodeErrors (Custom MyError, []))
+
 -}
 fail : e -> Decoder e v
 fail e =
     Decoder <| \_ -> Err ( Custom e, [] )
 
 
-{-| TODO
+{-| Transform the value a decoder will produce.
+
+    shout : Decoder e String
+    shout =
+        map String.toUpper string
+
+
+    "message = 'hello there'"
+        |> decodeString (field "message" shout)
+    --> Ok "HELLO THERE"
+
 -}
 map : (a -> b) -> Decoder e a -> Decoder e b
 map f (Decoder decoderFn) =
     Decoder (Result.map f << decoderFn)
 
 
-{-| TODO
+{-| Transform the error value produced by your custom error type.
+
+Perhaps you want to reuse decoders across multiple modules, each producing a
+certain type of errors? Either way, this allows transforming them.
+
+    type BaseError = BaseError
+    type Wrapped = Wrapped BaseError
+
+
+    baseDecoder : Decoder BaseError a
+    baseDecoder =
+        fail BaseError
+
+
+    wrappedDecoder : Decoder Wrapped a
+    wrappedDecoder =
+        mapError Wrapped baseDecoder
+
+
+    "message = 'hi'"
+        |> decodeString (field "message" wrappedDecoder)
+    --> Err (DecodeErrors (InField "message" (Custom (Wrapped BaseError), []), []))
+
 -}
 mapError : (e1 -> e2) -> Decoder e1 a -> Decoder e2 a
 mapError f (Decoder decoderFn) =
@@ -178,7 +249,38 @@ mapCustom f error =
             OneOf (List.map (mapErrors f) es)
 
 
-{-| TODO
+{-| Combine the values produced by 2 decoders using a function.
+
+    type alias Person =
+        { name : String
+        , age : Int
+        }
+
+    person : Decoder e Person
+    person =
+        map2 Person
+            (field "name" string)
+            (field "age" int)
+
+
+    people : Decoder e (List Person)
+    people =
+        list person
+
+
+    """
+    [[people]]
+    name = "Alice"
+    age = 43
+    [[people]]
+    name = "Bob"
+    age = 34
+    """
+        |> decodeString (field "people" people)
+    --> Ok [ { name = "Alice", age = 43 }
+    -->    , { name = "Bob", age = 34 }
+    -->    ]
+
 -}
 map2 : (a -> b -> c) -> Decoder e a -> Decoder e b -> Decoder e c
 map2 f (Decoder decA) (Decoder decB) =
@@ -198,14 +300,114 @@ map2 f (Decoder decA) (Decoder decB) =
                     Err e
 
 
-{-| TODO
+{-| Useful to make pipelines of decoders, by decoding to a function and applying
+it to values produced by other pieces of the pipeline.
+
+    type alias Person =
+        { name : String
+        , age : Int
+        }
+
+    person : Decoder e Person
+    person =
+        -- `Decoder e (String -> Int -> Person)`
+        succeed Person
+            -- adding a string, so `Decoder e (Int -> Person)`
+            |> andMap (field "name" string)
+            -- And with the int added, we get a `Decoder e Person`
+            |> andMap (field "age" int)
+
+
+    people : Decoder e (List Person)
+    people =
+        list person
+
+
+    """
+    [[people]]
+    name = "Alice"
+    age = 43
+    [[people]]
+    name = "Bob"
+    age = 34
+    """
+        |> decodeString (field "people" people)
+    --> Ok [ { name = "Alice", age = 43 }
+    -->    , { name = "Bob", age = 34 }
+    -->    ]
+
 -}
 andMap : Decoder e a -> Decoder e (a -> b) -> Decoder e b
 andMap second first =
     map2 (<|) first second
 
 
-{-| TODO
+{-| Create a decoder based on the value produced by a different decoders.
+
+This can be especially useful when decoding based on some sort of discriminating
+value.
+
+    type Utensil
+        = Spoon
+        | Knife { serrated : Bool }
+        | Fork { prongs : Int }
+
+
+    type MyError
+        = UnknownUtensilType String
+
+
+    knifeInfo : Decoder e { serrated : Bool }
+    knifeInfo =
+        map (\serrated -> { serrated = serrated })
+            (field "serrated" bool)
+
+
+    forkInfo : Decoder e { prongs : Int }
+    forkInfo =
+        map (\prongs -> { prongs = prongs })
+            (field "prongs" int)
+
+
+    utensilFromString : String -> Decoder String Utensil
+    utensilFromString utensilType =
+        case utensilType of
+            "spoon" ->
+                succeed Spoon
+            "knife" ->
+                map Knife knifeInfo
+            "fork" ->
+                map Fork forkInfo
+            _ ->
+                fail utensilType
+
+
+    utensil : Decoder MyError Utensil
+    utensil =
+        field "variety" string
+            |> andThen utensilFromString
+            |> mapError UnknownUtensilType
+
+
+    input : String
+    input =
+        """
+    [[utensils]]
+    variety = 'spoon'
+    [[utensils]]
+    variety = 'knife'
+    serrated = false
+    [[utensils]]
+    variety = 'fork'
+    prongs = 3
+        """
+
+    decodeString (field "utensils" (list utensil)) input
+    --> Ok [ Spoon
+    -->    , Knife { serrated = False }
+    -->    , Fork { prongs = 3 }
+    -->    ]
+
 -}
 andThen : (a -> Decoder e b) -> Decoder e a -> Decoder e b
 andThen toDecB (Decoder decoderFn) =

@@ -5,6 +5,6 @@
     "elm-verify-examples": "^2.3.1"
   },
   "scripts": {
-    "test": "elm-format --validate src && elm-test"
+    "test": "elm-format --validate src && elm-verify-examples && elm-test"
   }
 }
