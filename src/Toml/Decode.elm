@@ -55,12 +55,12 @@ module Toml.Decode
 
 # Building more complex decoders
 
-@docs succeed, fail, map, andThen, mapError, map2, andMap, map3, map4, map5, map6, map7, map8, lazy, oneOf
+@docs succeed, fail, map, oneOf, andThen, mapError, map2, andMap, map3, map4, map5, map6, map7, map8, lazy
 
 
 # Errors
 
-@docs Errors, Error, DecodeError
+@docs Error, Errors, DecodeError
 
 -}
 
@@ -514,19 +514,95 @@ map8 f decA decB decC decD decE decF decG decH =
         |> andMap decH
 
 
-{-| TODO
+{-| Required for constructing recursive decoders.
+
+    type Tree
+        = Node String
+        | Branch String (List Tree)
+
+
+    branch : Decoder e Tree
+    branch =
+        map2 Branch
+            (field "label" string)
+            (field "children" (lazy (\_ -> list tree)))
+
+
+    node : Decoder e Tree
+    node =
+        map Node (field "label" string)
+
+
+    tree : Decoder e Tree
+    tree =
+        oneOf
+            [ lazy (\_ -> branch)
+            , node
+            ]
+
+
+    """
+    label = 'root'
+    [[children]]
+    label = 'first child'
+    [[children]]
+    label = 'a branch'
+    [[children.children]]
+    label = 'a nested child'
+    [[children.children]]
+    label = 'another nested child'
+    """
+        |> decodeString tree
+    --> Ok ( Branch "root"
+    -->        [ Node "first child"
+    -->        , Branch "a branch"
+    -->            [ Node "a nested child"
+    -->            , Node "another nested child"
+    -->            ]
+    -->        ]
+    -->    )
+
 -}
 lazy : (() -> Decoder e a) -> Decoder e a
 lazy dec =
     Decoder <| \v -> run (dec ()) v
 
 
-run : Decoder e a -> Toml.Value -> Result (Errors e) a
-run (Decoder decoderFn) =
-    decoderFn
+{-| Try a bunch of decoders and succeed with the result of the first decoder to
+succeed.
+
+If none of the decoders succeed, the errors are collected and returned using the
+`OneOf` constructor.
+
+    type StringOrInt = AString String | AnInt Int
 
 
-{-| TODO
+    stringOrInt : Decoder e StringOrInt
+    stringOrInt =
+        oneOf
+            [ map AString string
+            , map AnInt int
+            ]
+
+
+    input : String
+    input =
+        """
+    item1 = "foo"
+    item2 = 123
+    item3 = "bar"
+        """
+
+
+    decodeString (field "item1" stringOrInt) input
+    --> Ok (AString "foo")
+
+    decodeString (field "item2" stringOrInt) input
+    --> Ok (AnInt 123)
+
+    decodeString (field "item3" stringOrInt) input
+    --> Ok (AString "bar")
+
 -}
 oneOf : List (Decoder e a) -> Decoder e a
 oneOf decoders =
@@ -887,3 +963,8 @@ expected expectedType actualValue =
 missingIndex : Int -> Result (Errors e) a
 missingIndex idx =
     Err ( MissingIndex idx, [] )
+
+
+run : Decoder e a -> Toml.Value -> Result (Errors e) a
+run (Decoder decoderFn) =
+    decoderFn
