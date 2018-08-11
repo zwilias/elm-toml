@@ -733,41 +733,79 @@ list entryDecoder =
     Decoder <|
         \v ->
             case v of
-                Toml.Array Toml.AEmpty ->
-                    Ok []
-
-                Toml.Array (Toml.AString s) ->
-                    listHelper Toml.String s entryDecoder
-
-                Toml.Array (Toml.ABool b) ->
-                    listHelper Toml.Bool b entryDecoder
-
-                Toml.Array (Toml.AInt i) ->
-                    listHelper Toml.Int i entryDecoder
-
-                Toml.Array (Toml.AFloat f) ->
-                    listHelper Toml.Float f entryDecoder
-
-                Toml.Array (Toml.ALocalDate ld) ->
-                    listHelper Toml.LocalDate ld entryDecoder
-
-                Toml.Array (Toml.ALocalTime lt) ->
-                    listHelper Toml.LocalTime lt entryDecoder
-
-                Toml.Array (Toml.ALocalDateTime ldt) ->
-                    listHelper Toml.LocalDateTime ldt entryDecoder
-
-                Toml.Array (Toml.ADateTime dt) ->
-                    listHelper Toml.DateTime dt entryDecoder
-
-                Toml.Array (Toml.ATable t) ->
-                    listHelper Toml.Table t entryDecoder
-
-                Toml.Array (Toml.AArray a) ->
-                    listHelper Toml.Array a entryDecoder
+                Toml.Array arrayValue ->
+                    listValue arrayValue entryDecoder
 
                 _ ->
                     expected "array" v
+
+
+listValue : Toml.ArrayValue -> Decoder e a -> Result (Errors e) (List a)
+listValue v entryDecoder =
+    case v of
+        Toml.AEmpty ->
+            Ok []
+
+        Toml.AString s ->
+            listHelper Toml.String s entryDecoder
+
+        Toml.ABool b ->
+            listHelper Toml.Bool b entryDecoder
+
+        Toml.AInt i ->
+            listHelper Toml.Int i entryDecoder
+
+        Toml.AFloat f ->
+            listHelper Toml.Float f entryDecoder
+
+        Toml.ALocalDate ld ->
+            listHelper Toml.LocalDate ld entryDecoder
+
+        Toml.ALocalTime lt ->
+            listHelper Toml.LocalTime lt entryDecoder
+
+        Toml.ALocalDateTime ldt ->
+            listHelper Toml.LocalDateTime ldt entryDecoder
+
+        Toml.ADateTime dt ->
+            listHelper Toml.DateTime dt entryDecoder
+
+        Toml.ATable t ->
+            listHelper Toml.Table t entryDecoder
+
+        Toml.AArray a ->
+            listHelper Toml.Array a entryDecoder
+
+
+listHelper :
+    (v -> Toml.Value)
+    -> Array v
+    -> Decoder e a
+    -> Result (Errors e) (List a)
+listHelper toTomlVal vals (Decoder decoderFn) =
+    Array.foldr (collectArr << decoderFn << toTomlVal)
+        ( Array.length vals - 1, Ok [] )
+        vals
+        |> Tuple.second
+
+
+collectArr :
+    Result (Errors e) a
+    -> ( Int, Result (Errors e) (List a) )
+    -> ( Int, Result (Errors e) (List a) )
+collectArr res ( idx, acc ) =
+    case ( res, acc ) of
+        ( Err e, Err ( er, ers ) ) ->
+            ( idx - 1, Err ( AtIndex idx e, er :: ers ) )
+
+        ( Err e, Ok _ ) ->
+            ( idx - 1, Err ( AtIndex idx e, [] ) )
+
+        ( Ok _, Err e ) ->
+            ( idx - 1, acc )
+
+        ( Ok v, Ok vs ) ->
+            ( idx - 1, Ok (v :: vs) )
 
 
 {-| TODO
@@ -835,37 +873,6 @@ indexHelper idx (Decoder entryDecoderFn) toTomlValue arr =
 
         Nothing ->
             missingIndex idx
-
-
-listHelper :
-    (v -> Toml.Value)
-    -> Array v
-    -> Decoder e a
-    -> Result (Errors e) (List a)
-listHelper toTomlVal vals (Decoder decoderFn) =
-    Array.foldr (collectArr << decoderFn << toTomlVal)
-        ( Array.length vals - 1, Ok [] )
-        vals
-        |> Tuple.second
-
-
-collectArr :
-    Result (Errors e) a
-    -> ( Int, Result (Errors e) (List a) )
-    -> ( Int, Result (Errors e) (List a) )
-collectArr res ( idx, acc ) =
-    case ( res, acc ) of
-        ( Err e, Err ( er, ers ) ) ->
-            ( idx - 1, Err ( AtIndex idx e, er :: ers ) )
-
-        ( Err e, Ok _ ) ->
-            ( idx - 1, Err ( AtIndex idx e, [] ) )
-
-        ( Ok _, Err e ) ->
-            ( idx - 1, acc )
-
-        ( Ok v, Ok vs ) ->
-            ( idx - 1, Ok (v :: vs) )
 
 
 
