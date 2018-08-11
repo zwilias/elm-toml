@@ -1,5 +1,6 @@
 module Toml.Decode.Tests exposing (..)
 
+import Dict
 import Expect
 import Test exposing (..)
 import Toml
@@ -60,13 +61,28 @@ key = 5
         , t ( "List of ints", "key = [-1, 0, 1]", D.field "key" (D.list D.int), Ok [ -1, 0, 1 ] )
         , t ( "List of floats", "key = [-0.2, 0.0, 5.4]", D.field "key" (D.list D.float), Ok [ -0.2, 0, 5.4 ] )
         , t ( "List of strings", "key = ['foo', 'bar']", D.field "key" (D.list D.string), Ok [ "foo", "bar" ] )
-        ]
-
-
-combining : Test
-combining =
-    describe "combinating decoders"
-        [ t
+        , t ( "succeed succeeds", "key = true", D.succeed "all good", Ok "all good" )
+        , t ( "fail fails", "key = true", D.fail "oh no!", Err ( D.Custom "oh no!", [] ) )
+        , t ( "map maps", "key = 1", D.map ((*) 2) (D.field "key" D.int), Ok 2 )
+        , t
+            ( "dict collects"
+            , "one = 'one'\ntwo = 'two'"
+            , D.dict D.string
+            , Ok (Dict.fromList [ ( "one", "one" ), ( "two", "two" ) ])
+            )
+        , t
+            ( "dict only handles tables"
+            , "key = true"
+            , D.field "key" (D.dict D.string)
+            , Err ( D.InField "key" ( D.Expected "table" (Toml.Bool True), [] ), [] )
+            )
+        , t
+            ( "field likes the field to be there"
+            , ""
+            , D.field "key" D.string
+            , Err ( D.MissingField "key", [] )
+            )
+        , t
             ( "make pair"
             , """
 one = "foo"
@@ -107,6 +123,29 @@ two = "bar"
                     )
                 , [ D.InField "two" ( D.Expected "int" (Toml.String "bar"), [] ) ]
                 )
+            )
+        , t
+            ( "dict collects errors"
+            , """
+a = "ok"
+b = false
+c = "ok"
+d = 123
+             """
+            , D.dict D.string
+            , Err
+                ( D.InField "b"
+                    ( D.Expected "string" (Toml.Bool False)
+                    , []
+                    )
+                , [ D.InField "d" ( D.Expected "string" (Toml.Int 123), [] ) ]
+                )
+            )
+        , t
+            ( "at drills down"
+            , "[foo.bar]\nbaz = 'hi'"
+            , D.at [ "foo", "bar", "baz" ] D.string
+            , Ok "hi"
             )
         ]
 
