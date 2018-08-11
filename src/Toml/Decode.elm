@@ -787,7 +787,25 @@ dateTime =
                     expected "dateTime" v
 
 
-{-| TODO
+{-| Reads the value of a field using the provided decoder.
+
+    "key = 'value'"
+        |> decodeString (field "key" string)
+    --> Ok "value"
+
+If the specified field does not exist, this can result in a `MissingField`
+error:
+
+    ""
+        |> decodeString (field "key" string)
+    --> Err (DecodeErrors (MissingField "key", []))
+
+Errors in the provided decoder are wrapped in `InField`:
+
+    "key = 'value'"
+        |> decodeString (field "key" (fail "noooo"))
+    --> Err (DecodeErrors (InField "key" (Custom "noooo", []), []))
+
 -}
 field : String -> Decoder e a -> Decoder e a
 field key (Decoder decoderFn) =
@@ -807,7 +825,39 @@ field key (Decoder decoderFn) =
                     expected "table" v
 
 
-{-| TODO
+{-| Decode a value "at" a given path with the provided decoder.
+
+    """
+    [foo.bar]
+    baz.wow = true
+    """
+        |> decodeString (at ["foo", "bar", "baz", "wow"] bool)
+    --> Ok True
+
+-}
+at : List String -> Decoder e a -> Decoder e a
+at fields dec =
+    List.foldr field dec fields
+
+
+{-| Decode a TOML table into a `Dict`.
+
+    import Dict
+
+
+    """
+    key1 = "value1"
+    key2 = "value2"
+    key3 = "value3"
+    """
+        |> decodeString (dict string)
+    --> Ok (Dict.fromList
+    -->      [ ( "key1", "value1" )
+    -->      , ( "key2", "value2" )
+    -->      , ( "key3", "value3" )
+    -->      ]
+    -->    )
+
 -}
 dict : Decoder e a -> Decoder e (Dict String a)
 dict (Decoder fieldDecoder) =
@@ -824,8 +874,6 @@ dict (Decoder fieldDecoder) =
                     expected "table" v
 
 
-{-| TODO
--}
 collectDict :
     String
     -> Result (Errors e) a
@@ -846,14 +894,14 @@ collectDict key res acc =
             Ok (Dict.insert key v vs)
 
 
-{-| TODO
--}
-at : List String -> Decoder e a -> Decoder e a
-at fields dec =
-    List.foldr field dec fields
+{-| Decode a TOML array using the provided decoder to decode the values.
 
+    """
+    items = [true, false, false, true, false]
+    """
+        |> decodeString (field "items" (list bool))
+    --> Ok [ True, False, False, True, False ]
 
-{-| TODO
 -}
 list : Decoder e a -> Decoder e (List a)
 list entryDecoder =
@@ -935,7 +983,14 @@ collectArr res ( idx, acc ) =
             ( idx - 1, Ok (v :: vs) )
 
 
-{-| TODO
+{-| Decode a certain index of a TOML array using the provided decoder.
+
+    """
+    names = [ "Brian", "Carol", "Derek", "Elisa" ]
+    """
+        |> decodeString (field "names" (index 2 string))
+    --> Ok "Derek"
+
 -}
 index : Int -> Decoder e a -> Decoder e a
 index idx entryDecoder =
