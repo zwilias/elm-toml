@@ -5,6 +5,7 @@ module Toml.Decode
         , Error(..)
         , Errors
         , andMap
+        , andThen
         , at
         , bool
         , dateTime
@@ -21,6 +22,12 @@ module Toml.Decode
         , localDateTime
         , map
         , map2
+        , map3
+        , map4
+        , map5
+        , map6
+        , map7
+        , map8
         , mapError
         , string
         , succeed
@@ -139,6 +146,103 @@ map2 f (Decoder decA) (Decoder decB) =
 andMap : Decoder e a -> Decoder e (a -> b) -> Decoder e b
 andMap second first =
     map2 (<|) first second
+
+
+andThen : (a -> Decoder e b) -> Decoder e a -> Decoder e b
+andThen toDecB (Decoder decoderFn) =
+    Decoder <|
+        \v ->
+            case decoderFn v of
+                Ok a ->
+                    let
+                        (Decoder decoderFn2) =
+                            toDecB a
+                    in
+                    decoderFn2 v
+
+                Err e ->
+                    Err e
+
+
+map3 :
+    (a -> b -> c -> d)
+    -> Decoder e a
+    -> Decoder e b
+    -> Decoder e c
+    -> Decoder e d
+map3 f decA decB decC =
+    map2 f decA decB
+        |> andMap decC
+
+
+map4 :
+    (a -> b -> c -> d -> e)
+    -> Decoder x a
+    -> Decoder x b
+    -> Decoder x c
+    -> Decoder x d
+    -> Decoder x e
+map4 f decA decB decC decD =
+    map3 f decA decB decC
+        |> andMap decD
+
+
+map5 :
+    (a -> b -> c -> d -> e -> f)
+    -> Decoder x a
+    -> Decoder x b
+    -> Decoder x c
+    -> Decoder x d
+    -> Decoder x e
+    -> Decoder x f
+map5 f decA decB decC decD decE =
+    map4 f decA decB decC decD
+        |> andMap decE
+
+
+map6 :
+    (a -> b -> c -> d -> e -> f -> g)
+    -> Decoder x a
+    -> Decoder x b
+    -> Decoder x c
+    -> Decoder x d
+    -> Decoder x e
+    -> Decoder x f
+    -> Decoder x g
+map6 f decA decB decC decD decE decF =
+    map5 f decA decB decC decD decE
+        |> andMap decF
+
+
+map7 :
+    (a -> b -> c -> d -> e -> f -> g -> h)
+    -> Decoder x a
+    -> Decoder x b
+    -> Decoder x c
+    -> Decoder x d
+    -> Decoder x e
+    -> Decoder x f
+    -> Decoder x g
+    -> Decoder x h
+map7 f decA decB decC decD decE decF decG =
+    map6 f decA decB decC decD decE decF
+        |> andMap decG
+
+
+map8 :
+    (a -> b -> c -> d -> e -> f -> g -> h -> i)
+    -> Decoder x a
+    -> Decoder x b
+    -> Decoder x c
+    -> Decoder x d
+    -> Decoder x e
+    -> Decoder x f
+    -> Decoder x g
+    -> Decoder x h
+    -> Decoder x i
+map8 f decA decB decC decD decE decF decG decH =
+    map7 f decA decB decC decD decE decF decG
+        |> andMap decH
 
 
 string : Decoder e String
