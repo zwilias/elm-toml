@@ -16,6 +16,7 @@ module Toml.Decode
         , float
         , index
         , int
+        , lazy
         , list
         , localDate
         , localDateTime
@@ -29,6 +30,7 @@ module Toml.Decode
         , map7
         , map8
         , mapError
+        , oneOf
         , string
         , succeed
         )
@@ -53,7 +55,7 @@ module Toml.Decode
 
 # Building more complex decoders
 
-@docs succeed, fail, map, andThen, mapError, map2, andMap, map3, map4, map5, map6, map7, map8
+@docs succeed, fail, map, andThen, mapError, map2, andMap, map3, map4, map5, map6, map7, map8, lazy, oneOf
 
 
 # Errors
@@ -85,6 +87,7 @@ type DecodeError e
     | MissingField String
     | AtIndex Int (Errors e)
     | InField String (Errors e)
+    | OneOf (List (Errors e))
     | Custom e
 
 
@@ -171,6 +174,9 @@ mapCustom f error =
         InField field e ->
             InField field (mapErrors f e)
 
+        OneOf es ->
+            OneOf (List.map (mapErrors f) es)
+
 
 {-| TODO
 -}
@@ -207,11 +213,7 @@ andThen toDecB (Decoder decoderFn) =
         \v ->
             case decoderFn v of
                 Ok a ->
-                    let
-                        (Decoder decoderFn2) =
-                            toDecB a
-                    in
-                    decoderFn2 v
+                    run (toDecB a) v
 
                 Err e ->
                     Err e
@@ -308,6 +310,40 @@ map8 :
 map8 f decA decB decC decD decE decF decG decH =
     map7 f decA decB decC decD decE decF decG
         |> andMap decH
+
+
+{-| TODO
+-}
+lazy : (() -> Decoder e a) -> Decoder e a
+lazy dec =
+    Decoder <| \v -> run (dec ()) v
+
+
+run : Decoder e a -> Toml.Value -> Result (Errors e) a
+run (Decoder decoderFn) =
+    decoderFn
+
+
+{-| TODO
+-}
+oneOf : List (Decoder e a) -> Decoder e a
+oneOf decoders =
+    Decoder <| \v -> oneOfHelp v decoders []
+
+
+oneOfHelp : Toml.Value -> List (Decoder e a) -> List (Errors e) -> Result (Errors e) a
+oneOfHelp val decoders acc =
+    case decoders of
+        [] ->
+            Err ( OneOf (List.reverse acc), [] )
+
+        decoder :: rest ->
+            case run decoder val of
+                Ok v ->
+                    Ok v
+
+                Err e ->
+                    oneOfHelp val rest (e :: acc)
 
 
 {-| TODO
