@@ -609,7 +609,11 @@ oneOf decoders =
     Decoder <| \v -> oneOfHelp v decoders []
 
 
-oneOfHelp : Toml.Value -> List (Decoder e a) -> List (Errors e) -> Result (Errors e) a
+oneOfHelp :
+    Toml.Value
+    -> List (Decoder e a)
+    -> List (Errors e)
+    -> Result (Errors e) a
 oneOfHelp val decoders acc =
     case decoders of
         [] ->
@@ -624,7 +628,12 @@ oneOfHelp val decoders acc =
                     oneOfHelp val rest (e :: acc)
 
 
-{-| TODO
+{-| Decode a string value.
+
+    "my-key = 'my value'"
+        |> decodeString (field "my-key" string)
+    --> Ok "my value"
+
 -}
 string : Decoder e String
 string =
@@ -638,7 +647,12 @@ string =
                     expected "string" v
 
 
-{-| TODO
+{-| Decode an integer value.
+
+    "my-key = -703"
+        |> decodeString (field "my-key" int)
+    --> Ok -703
+
 -}
 int : Decoder e Int
 int =
@@ -652,7 +666,12 @@ int =
                     expected "int" v
 
 
-{-| TODO
+{-| Decode a floating point value.
+
+    "my-key = 123.456"
+        |> decodeString (field "my-key" float)
+    --> Ok 123.456
+
 -}
 float : Decoder e Float
 float =
@@ -666,7 +685,12 @@ float =
                     expected "float" v
 
 
-{-| TODO
+{-| Decode a boolean value.
+
+    "my-key = true"
+        |> decodeString (field "my-key" bool)
+    --> Ok True
+
 -}
 bool : Decoder e Bool
 bool =
@@ -680,7 +704,12 @@ bool =
                     expected "bool" v
 
 
-{-| TODO
+{-| Decode a local date.
+
+    "today = 2018-08-11"
+        |> decodeString (field "today" localDate)
+    --> Ok { year = 2018, month = 8, day = 11 }
+
 -}
 localDate : Decoder e Calendar.Date
 localDate =
@@ -694,7 +723,12 @@ localDate =
                     expected "localDate" v
 
 
-{-| TODO
+{-| Decode a local time.
+
+    "now = 14:08:49.02"
+        |> decodeString (field "now" localTime)
+    --> Ok { hours = 14, minutes = 8, seconds = 49.02 }
+
 -}
 localTime : Decoder e Calendar.Time
 localTime =
@@ -708,7 +742,15 @@ localTime =
                     expected "localTime" v
 
 
-{-| TODO
+{-| Decode a local date-time.
+
+    "now = 2018-08-11T14:10:23.70"
+        |> decodeString (field "now" localDateTime)
+    --> Ok
+    -->   { date = { year = 2018, month = 8, day = 11 }
+    -->   , time = { hours = 14, minutes = 10, seconds = 23.70 }
+    -->   }
+
 -}
 localDateTime : Decoder e Calendar.LocalDateTime
 localDateTime =
@@ -722,7 +764,16 @@ localDateTime =
                     expected "localDateTime" v
 
 
-{-| TODO
+{-| Decode an absolute time with UTF offset.
+
+    "now = 2018-08-11T14:10:23.70Z"
+        |> decodeString (field "now" dateTime)
+    --> Ok
+    -->   { date = { year = 2018, month = 8, day = 11 }
+    -->   , time = { hours = 14, minutes = 10, seconds = 23.70 }
+    -->   , offset = { hours = 0, minutes = 0 }
+    -->   }
+
 -}
 dateTime : Decoder e Calendar.DateTime
 dateTime =
